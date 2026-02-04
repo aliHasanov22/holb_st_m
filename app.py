@@ -108,11 +108,15 @@ def require_login(request: Request) -> Optional[int]:
 
 # -------------------- Helpers --------------------
 
+def _prehash_password(pw: str) -> bytes:
+    # bcrypt max input is 72 bytes; prehash ensures fixed safe length
+    return hashlib.sha256(pw.encode("utf-8")).digest()
+
 def hash_password(pw: str) -> str:
-    return pwd_context.hash(pw)
+    return pwd_context.hash(_prehash_password(pw))
 
 def verify_password(pw: str, hashed: str) -> bool:
-    return pwd_context.verify(pw, hashed)
+    return pwd_context.verify(_prehash_password(pw), hashed)
 
 def split_sentences(text: str) -> List[str]:
     # simple sentence splitting
