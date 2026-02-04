@@ -3,53 +3,98 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Student Planner MVP</title>
+    <title>Student Planner Pro</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        body { background-color: #f8f9fa; }
-        .completed { text-decoration: line-through; color: gray; }
-        .card { border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        body { background-color: #f0f2f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .completed { text-decoration: line-through; color: #adb5bd; }
+        .card { border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-radius: 12px; }
+        
+        /* Priority Indicators */
         .priority-High { border-left: 5px solid #dc3545; }
         .priority-Medium { border-left: 5px solid #ffc107; }
         .priority-Low { border-left: 5px solid #0d6efd; }
+        
+        /* Timer Styles */
+        .timer-display { font-family: 'Courier New', Courier, monospace; font-weight: bold; font-size: 2rem; }
     </style>
 </head>
 <body>
 
-<div id="app" class="container mt-5" style="max-width: 600px;">
-    <h2 class="text-center mb-4">📚 Student Planner</h2>
+<div id="app" class="container mt-4" style="max-width: 800px;">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>🎓 Student Planner</h2>
+        <span class="badge bg-dark">v1.0</span>
+    </div>
 
-    <div class="card p-3 mb-4">
-        <div class="row g-2">
-            <div class="col-7">
-                <input v-model="newTask" @keyup.enter="addTask" type="text" class="form-control" placeholder="What needs to be done?">
+    <div class="card p-4 mb-4 bg-white border-primary border-2">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <h5 class="text-primary"><i class="fas fa-stopwatch me-2"></i>Focus Session</h5>
+                <input v-model="studySubject" :disabled="timerRunning" type="text" class="form-control mb-2" placeholder="What are you studying? (e.g. Algorithms)">
             </div>
-            <div class="col-3">
-                <select v-model="newPriority" class="form-select">
-                    <option>Low</option>
-                    <option>Medium</option>
-                    <option>High</option>
-                </select>
-            </div>
-            <div class="col-2">
-                <button @click="addTask" class="btn btn-primary w-100">+</button>
+            <div class="col-md-6 text-center">
+                <div class="timer-display mb-2">{{ formattedTime }}</div>
+                <button v-if="!timerRunning" @click="startTimer" class="btn btn-success px-4"><i class="fas fa-play me-2"></i>Start</button>
+                <button v-if="timerRunning" @click="stopTimer" class="btn btn-danger px-4"><i class="fas fa-stop me-2"></i>Stop & Save</button>
             </div>
         </div>
     </div>
 
-    <div class="d-flex justify-content-between mb-3 text-muted">
-        <span>Pending: {{ pendingCount }}</span>
-        <span>Completed: {{ completedCount }}</span>
+    <div v-if="pendingCount > 0" class="alert" :class="workloadClass" role="alert">
+        <i class="fas fa-info-circle me-2"></i> {{ workloadMessage }}
+    </div>
+
+    <div class="card p-3 mb-4">
+        <h5 class="mb-3 text-muted">Add New Task</h5>
+        <div class="row g-2">
+            <div class="col-md-5">
+                <input v-model="newTask" @keyup.enter="addTask" type="text" class="form-control" placeholder="Task title...">
+            </div>
+            <div class="col-md-3">
+                <input v-model="newDueDate" type="date" class="form-control" title="Due Date">
+            </div>
+            <div class="col-md-2">
+                <select v-model="newPriority" class="form-select">
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button @click="addTask" class="btn btn-primary w-100"><i class="fas fa-plus"></i> Add</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between mb-2 text-muted px-2">
+        <span>Tasks Due</span>
+        <span>{{ completedCount }} / {{ tasks.length }} Completed</span>
+    </div>
+
+    <div v-if="tasks.length === 0" class="text-center text-muted mt-5">
+        <p>No tasks yet. Time to relax! 🏖️</p>
     </div>
 
     <div v-for="task in tasks" :key="task.id" class="card mb-2 p-3 d-flex flex-row justify-content-between align-items-center" :class="'priority-' + task.priority">
-        <div class="form-check">
-            <input class="form-check-input" type="checkbox" :checked="task.status === 'Completed'" @change="toggleTask(task)">
-            <span :class="{ completed: task.status === 'Completed' }">{{ task.title }}</span>
-            <small class="text-muted d-block" style="font-size: 0.8rem;">{{ task.priority }} Priority</small>
+        <div class="d-flex align-items-center">
+            <input class="form-check-input me-3" type="checkbox" :checked="task.status === 'Completed'" @change="toggleTask(task)" style="transform: scale(1.2);">
+            <div>
+                <span class="fw-bold" :class="{ completed: task.status === 'Completed' }">{{ task.title }}</span>
+                <div class="text-muted small">
+                    <i class="far fa-calendar-alt me-1"></i> {{ task.due_date || 'No Date' }} 
+                    <span class="mx-2">•</span> 
+                    <span :class="{'text-danger': task.priority === 'High'}">{{ task.priority }} Priority</span>
+                </div>
+            </div>
         </div>
-        <button @click="deleteTask(task.id)" class="btn btn-sm btn-outline-danger">×</button>
+        <button @click="deleteTask(task.id)" class="btn btn-outline-secondary btn-sm border-0 text-danger hover-bg-light">
+            <i class="fas fa-trash"></i>
+        </button>
     </div>
+
 </div>
 
 <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
@@ -61,13 +106,39 @@
         data() {
             return {
                 tasks: [],
+                // Task Inputs
                 newTask: '',
-                newPriority: 'Medium'
+                newPriority: 'Medium',
+                newDueDate: '',
+                // Timer Data
+                studySubject: '',
+                timerSeconds: 0,
+                timerRunning: false,
+                timerInterval: null
             }
         },
         computed: {
             pendingCount() { return this.tasks.filter(t => t.status === 'Pending').length },
-            completedCount() { return this.tasks.filter(t => t.status === 'Completed').length }
+            completedCount() { return this.tasks.filter(t => t.status === 'Completed').length },
+            
+            // Format timer seconds into MM:SS
+            formattedTime() {
+                const mins = Math.floor(this.timerSeconds / 60).toString().padStart(2, '0');
+                const secs = (this.timerSeconds % 60).toString().padStart(2, '0');
+                return `${mins}:${secs}`;
+            },
+            
+            // Burnout Prevention Logic
+            workloadMessage() {
+                if (this.pendingCount > 8) return "⚠️ Heavy workload! Prioritize your top 3 tasks.";
+                if (this.pendingCount > 4) return "You're busy! Stay focused.";
+                return "Workload is manageable. Keep it up!";
+            },
+            workloadClass() {
+                if (this.pendingCount > 8) return "alert-danger";
+                if (this.pendingCount > 4) return "alert-warning";
+                return "alert-success";
+            }
         },
         methods: {
             async fetchTasks() {
@@ -76,13 +147,23 @@
             },
             async addTask() {
                 if (!this.newTask) return;
+                
+                // Send due_date to backend
                 const res = await fetch('/api/tasks', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ title: this.newTask, priority: this.newPriority })
+                    body: JSON.stringify({ 
+                        title: this.newTask, 
+                        priority: this.newPriority,
+                        due_date: this.newDueDate 
+                    })
                 });
                 this.tasks.unshift(await res.json());
+                
+                // Reset form
                 this.newTask = '';
+                this.newPriority = 'Medium';
+                this.newDueDate = '';
             },
             async toggleTask(task) {
                 const res = await fetch(`/api/tasks/${task.id}/toggle`, { method: 'PUT' });
@@ -92,6 +173,40 @@
             async deleteTask(id) {
                 await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
                 this.tasks = this.tasks.filter(t => t.id !== id);
+            },
+            
+            // --- Timer Methods ---
+            startTimer() {
+                if (!this.studySubject) {
+                    alert("Please enter a subject to study!");
+                    return;
+                }
+                this.timerRunning = true;
+                this.timerInterval = setInterval(() => {
+                    this.timerSeconds++;
+                }, 1000);
+            },
+            async stopTimer() {
+                clearInterval(this.timerInterval);
+                this.timerRunning = false;
+                
+                const minutes = Math.max(1, Math.ceil(this.timerSeconds / 60));
+                
+                // Save session to backend
+                try {
+                    await fetch('/api/study', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ subject: this.studySubject, duration: minutes })
+                    });
+                    alert(`Saved: ${minutes} minutes of ${this.studySubject}`);
+                } catch (e) {
+                    console.error("Error saving study session");
+                }
+                
+                // Reset Timer
+                this.timerSeconds = 0;
+                this.studySubject = '';
             }
         },
         mounted() {
