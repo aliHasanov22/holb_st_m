@@ -13,7 +13,7 @@ db = SQLAlchemy(app)
 # Go to Google Maps, right-click your campus, and copy the numbers.
 CAMPUS_LAT = 40.40663934042372
 CAMPUS_LON =  49.848206791133954
-MAX_DISTANCE_METERS = 200
+MAX_DISTANCE_METERS = 50
 # --- MODELS ---
 class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
