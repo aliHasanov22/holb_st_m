@@ -1,77 +1,88 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Student Planner Pro</title>
+    <title>Holberton Planner</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
     <style>
-        body { background-color: #f0f2f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .completed { text-decoration: line-through; color: #adb5bd; }
-        .card { border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-radius: 12px; }
-        .priority-High { border-left: 5px solid #dc3545; }
-        .priority-Medium { border-left: 5px solid #ffc107; }
-        .priority-Low { border-left: 5px solid #0d6efd; }
-        .timer-display { font-family: 'Courier New', Courier, monospace; font-weight: bold; font-size: 2rem; }
-        /* Table Styles */
-        .table-sm td, .table-sm th { font-size: 0.85rem; vertical-align: middle; }
+        :root { --holberton-red: #e00034; --bg-dark: #121212; --card-bg: #1e1e1e; }
+        body { background-color: var(--bg-dark); font-family: 'Roboto Mono', monospace; color: #e0e0e0; }
+        .text-holberton { color: var(--holberton-red) !important; }
+        .bg-holberton { background-color: var(--holberton-red) !important; color: white; }
+        .border-holberton { border-color: var(--holberton-red) !important; }
+        .card { background-color: var(--card-bg); border: 1px solid #333; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .btn-primary { background-color: var(--holberton-red); border-color: var(--holberton-red); font-weight: bold; }
+        .btn-primary:hover { background-color: #b3002a; border-color: #b3002a; }
+        .priority-High { border-left: 4px solid var(--holberton-red); background-color: rgba(224, 0, 52, 0.1); }
+        .priority-Medium { border-left: 4px solid #ffc107; }
+        .priority-Low { border-left: 4px solid #0dcaf0; }
+        .timer-display { font-size: 2.5rem; color: white; text-shadow: 0 0 10px rgba(224, 0, 52, 0.5); }
+        input, select { background-color: #2b2b2b !important; border: 1px solid #444 !important; color: white !important; }
+        input:focus { border-color: var(--holberton-red) !important; }
+        .table { color: #ccc; }
+        /* GPS Animation */
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(224, 0, 52, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(224, 0, 52, 0); } 100% { box-shadow: 0 0 0 0 rgba(224, 0, 52, 0); } }
+        .gps-active { animation: pulse 2s infinite; }
     </style>
 </head>
 <body>
 
 {% raw %}
-<div id="app" class="container mt-4" style="max-width: 950px;">
+<div id="app" class="container mt-4" style="max-width: 1000px;">
     
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>🎓 Student Planner</h2>
-        <span class="badge bg-dark">v1.2</span>
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary pb-3">
+        <h2 class="fw-bold"><i class="fas fa-terminal text-holberton me-2"></i>HOLBERTON <span class="text-holberton">PLANNER</span></h2>
+        <span class="badge bg-holberton">v3.0 Geo</span>
     </div>
 
     <div class="row">
-        <div class="col-md-7">
-            
-            <div class="card p-4 mb-4 bg-white border-primary border-2">
-                <h5 class="text-primary"><i class="fas fa-stopwatch me-2"></i>Focus Session</h5>
-                <div class="d-flex align-items-center gap-2">
-                    <input v-model="studySubject" :disabled="timerRunning" type="text" class="form-control" placeholder="Subject...">
-                    <div class="fw-bold fs-4">{{ formattedTime }}</div>
-                    <button v-if="!timerRunning" @click="startTimer" class="btn btn-success btn-sm"><i class="fas fa-play"></i></button>
-                    <button v-if="timerRunning" @click="stopTimer" class="btn btn-danger btn-sm"><i class="fas fa-stop"></i></button>
+        <div class="col-lg-7">
+            <div class="card p-4 mb-4 border-holberton">
+                <h5 class="text-holberton mb-3"><i class="fas fa-code me-2"></i>Deep Work Session</h5>
+                <div class="row align-items-center">
+                    <div class="col-7"><input v-model="studySubject" :disabled="timerRunning" type="text" class="form-control mb-2" placeholder="Project name..."></div>
+                    <div class="col-5 text-end"><div class="timer-display">{{ formattedTime }}</div></div>
+                </div>
+                <div class="d-flex gap-2 mt-2">
+                    <button v-if="!timerRunning" @click="startTimer" class="btn btn-outline-light w-100"><i class="fas fa-play me-2"></i>Start</button>
+                    <button v-if="timerRunning" @click="stopTimer" class="btn btn-primary w-100"><i class="fas fa-save me-2"></i>Stop</button>
                 </div>
             </div>
 
             <div class="card p-3 mb-4">
-                <h5 class="mb-3 text-muted">Add Task</h5>
+                <h6 class="text-secondary text-uppercase mb-3 small fw-bold">New Ticket</h6>
                 <div class="row g-2">
-                    <div class="col-6"><input v-model="newTask" @keyup.enter="addTask" type="text" class="form-control" placeholder="Title..."></div>
-                    <div class="col-3"><input v-model="newDueDate" type="date" class="form-control"></div>
-                    <div class="col-3"><button @click="addTask" class="btn btn-primary w-100">Add</button></div>
+                    <div class="col-6"><input v-model="newTask" @keyup.enter="addTask" type="text" class="form-control" placeholder="Task..."></div>
+                    <div class="col-4"><input v-model="newDueDate" type="date" class="form-control"></div>
+                    <div class="col-2"><button @click="addTask" class="btn btn-light w-100 fw-bold text-dark">Add</button></div>
                 </div>
             </div>
-
             <div v-for="task in tasks" :key="task.id" class="card mb-2 p-2 px-3 d-flex flex-row justify-content-between align-items-center" :class="'priority-' + task.priority">
                 <div>
-                    <input class="form-check-input me-2" type="checkbox" :checked="task.status === 'Completed'" @change="toggleTask(task)">
-                    <span :class="{ completed: task.status === 'Completed' }">{{ task.title }}</span>
-                    <small class="text-muted ms-2" v-if="task.due_date">({{ task.due_date }})</small>
+                    <input class="form-check-input me-3 bg-dark border-secondary" type="checkbox" :checked="task.status === 'Completed'" @change="toggleTask(task)">
+                    <span :class="{ completed: task.status === 'Completed', 'fw-bold': true }">{{ task.title }}</span>
                 </div>
-                <button @click="deleteTask(task.id)" class="btn btn-sm text-danger"><i class="fas fa-trash"></i></button>
+                <button @click="deleteTask(task.id)" class="btn btn-sm btn-link text-secondary"><i class="fas fa-trash"></i></button>
             </div>
         </div>
 
-        <div class="col-md-5">
-            
+        <div class="col-lg-5">
             <div class="card p-4 mb-4">
-                <h5 class="text-dark"><i class="fas fa-university me-2"></i>Campus Attendance</h5>
-                <p class="text-muted small mb-2">Weekdays 08:00 - 18:00 only.</p>
+                <h5 class="text-white border-bottom border-secondary pb-2 mb-3">
+                    <i class="fas fa-map-marker-alt me-2 text-holberton"></i>Campus Access
+                </h5>
 
-                <div class="bg-light p-3 rounded mb-3">
-                    <div class="mb-2">
-                        <label class="small text-muted">Date</label>
-                        <input v-model="attDate" type="date" class="form-control form-control-sm">
-                    </div>
-                    <div class="row g-2 mb-2">
+                <button @click="gpsCheckIn" :disabled="gpsLoading" class="btn btn-outline-light w-100 mb-3 py-2 fw-bold" :class="{'gps-active': gpsLoading}">
+                    <span v-if="gpsLoading"><i class="fas fa-satellite-dish fa-spin me-2"></i>Locating...</span>
+                    <span v-else><i class="fas fa-crosshairs me-2 text-holberton"></i>GPS Auto-Fill</span>
+                </button>
+
+                <div class="p-3 rounded mb-4" style="background-color: #252525;">
+                    <div class="row g-2 mb-3">
                         <div class="col-6">
                             <label class="small text-muted">Entry</label>
                             <input v-model="attEntry" type="time" class="form-control form-control-sm">
@@ -81,49 +92,31 @@
                             <input v-model="attExit" type="time" class="form-control form-control-sm">
                         </div>
                     </div>
-                    <button @click="addAttendance" class="btn btn-dark w-100 btn-sm">Log Time</button>
+                    <button @click="addAttendance" class="btn btn-primary w-100 btn-sm">Confirm & Log</button>
                 </div>
 
-                <label class="fw-bold d-flex justify-content-between small mb-1">
-                    <span>Weekly Progress</span>
-                    <span>{{ attendanceHours }} / 15 hrs</span>
-                </label>
-                <div class="progress mb-3" style="height: 15px;">
-                    <div class="progress-bar" 
-                         :class="attendanceHours >= 15 ? 'bg-success' : 'bg-warning'" 
-                         role="progressbar" 
-                         :style="{ width: attendancePercent + '%' }">
-                    </div>
+                <div class="d-flex justify-content-between small mb-1">
+                    <span class="text-white">Weekly Quota</span>
+                    <span class="fw-bold" :class="attendanceHours >= 15 ? 'text-success' : 'text-warning'">{{ attendanceHours }} / 15 hrs</span>
+                </div>
+                <div class="progress mb-4" style="height: 10px; background-color: #333;">
+                    <div class="progress-bar bg-holberton" role="progressbar" :style="{ width: attendancePercent + '%' }"></div>
                 </div>
 
-                <h6 class="border-bottom pb-2">This Week's Logs</h6>
+                <h6 class="text-secondary small text-uppercase">Log History</h6>
                 <div style="max-height: 200px; overflow-y: auto;">
-                    <table class="table table-sm table-hover text-center">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Date</th>
-                                <th>Time</th>
-                                <th>Valid Hrs</th>
-                            </tr>
-                        </thead>
+                    <table class="table table-sm table-dark table-hover small">
+                        <thead><tr><th class="text-secondary">Date</th><th class="text-secondary">Range</th><th class="text-end text-secondary">Hrs</th></tr></thead>
                         <tbody>
                             <tr v-for="log in attendanceLogs" :key="log.date + log.entry">
-                                <td>{{ log.date.slice(5) }}</td> <td class="small text-muted">{{ log.entry }} - {{ log.exit }}</td>
-                                <td class="fw-bold text-success">{{ log.hours }}</td>
-                            </tr>
-                            <tr v-if="attendanceLogs.length === 0">
-                                <td colspan="3" class="text-muted small">No logs yet this week.</td>
+                                <td>{{ log.date.slice(5) }}</td>
+                                <td class="text-muted">{{ log.entry }}-{{ log.exit }}</td>
+                                <td class="text-end fw-bold" :class="log.hours > 0 ? 'text-success' : 'text-secondary'">{{ log.hours }}</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
-
-                <div v-if="attendanceHours < 15" class="alert alert-danger py-2 small mt-2">
-                    <i class="fas fa-exclamation-triangle me-1"></i> 
-                    Missing <b>{{ (15 - attendanceHours).toFixed(1) }}</b> hours.
-                </div>
             </div>
-
         </div>
     </div>
 </div>
@@ -136,106 +129,90 @@
     const app = createApp({
         data() {
             return {
-                tasks: [],
-                newTask: '', newPriority: 'Medium', newDueDate: '',
+                tasks: [], newTask: '', newPriority: 'Medium', newDueDate: '',
                 studySubject: '', timerSeconds: 0, timerRunning: false, timerInterval: null,
-                
-                // Attendance Data
-                attDate: new Date().toISOString().split('T')[0], // Default to Today
-                attEntry: '',
-                attExit: '',
-                attendanceHours: 0,
-                attendanceLogs: [] // Stores the history list
+                attDate: new Date().toISOString().split('T')[0],
+                attEntry: '', attExit: '', attendanceHours: 0, attendanceLogs: [],
+                gpsLoading: false // NEW for spinner
             }
         },
         computed: {
-            pendingCount() { return this.tasks.filter(t => t.status === 'Pending').length },
             formattedTime() {
                 const mins = Math.floor(this.timerSeconds / 60).toString().padStart(2, '0');
                 const secs = (this.timerSeconds % 60).toString().padStart(2, '0');
                 return `${mins}:${secs}`;
             },
-            attendancePercent() {
-                return Math.min(100, (this.attendanceHours / 15) * 100);
-            }
+            attendancePercent() { return Math.min(100, (this.attendanceHours / 15) * 100); }
         },
         methods: {
-            async fetchTasks() {
-                const res = await fetch('/api/tasks');
-                this.tasks = await res.json();
+            // --- GPS FUNCTION ---
+            gpsCheckIn() {
+                if (!navigator.geolocation) {
+                    return alert("Geolocation is not supported by your browser.");
+                }
+                this.gpsLoading = true;
+
+                navigator.geolocation.getCurrentPosition(
+                    async (position) => {
+                        // Success: Send coords to backend
+                        try {
+                            const res = await fetch('/api/attendance/check-location', {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({
+                                    lat: position.coords.latitude,
+                                    lon: position.coords.longitude
+                                })
+                            });
+                            const data = await res.json();
+                            this.gpsLoading = false;
+
+                            if (res.ok) {
+                                alert(data.message);
+                                // Auto-fill logic
+                                if (!this.attEntry) {
+                                    this.attEntry = data.time;
+                                } else {
+                                    this.attExit = data.time;
+                                }
+                            } else {
+                                alert(data.message); // Too far away
+                            }
+                        } catch (e) {
+                            this.gpsLoading = false;
+                            alert("Server error verifying location.");
+                        }
+                    },
+                    (error) => {
+                        // Error getting location
+                        this.gpsLoading = false;
+                        alert("Unable to retrieve location. Please allow GPS access.");
+                    }
+                );
             },
+            // --- Standard Methods ---
+            async fetchTasks() { const res = await fetch('/api/tasks'); this.tasks = await res.json(); },
             async addTask() {
                 if (!this.newTask) return;
-                const res = await fetch('/api/tasks', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ title: this.newTask, priority: this.newPriority, due_date: this.newDueDate })
-                });
-                this.tasks.unshift(await res.json());
-                this.newTask = '';
+                const res = await fetch('/api/tasks', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ title: this.newTask, priority: 'Medium', due_date: this.newDueDate }) });
+                this.tasks.unshift(await res.json()); this.newTask = '';
             },
-            async toggleTask(task) {
-                const res = await fetch(`/api/tasks/${task.id}/toggle`, { method: 'PUT' });
-                task.status = (await res.json()).status;
-            },
-            async deleteTask(id) {
-                await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
-                this.tasks = this.tasks.filter(t => t.id !== id);
-            },
-            startTimer() {
-                this.timerRunning = true;
-                this.timerInterval = setInterval(() => { this.timerSeconds++; }, 1000);
-            },
-            async stopTimer() {
-                clearInterval(this.timerInterval);
-                this.timerRunning = false;
-                this.timerSeconds = 0;
-            },
-            
-            // --- ATTENDANCE METHODS ---
-            async fetchAttendance() {
-                const res = await fetch('/api/attendance');
-                const data = await res.json();
-                this.attendanceHours = data.total_hours;
-                this.attendanceLogs = data.logs; // Save logs for the table
-            },
+            async toggleTask(task) { const res = await fetch(`/api/tasks/${task.id}/toggle`, { method: 'PUT' }); task.status = (await res.json()).status; },
+            async deleteTask(id) { await fetch(`/api/tasks/${id}`, { method: 'DELETE' }); this.tasks = this.tasks.filter(t => t.id !== id); },
+            startTimer() { this.timerRunning = true; this.timerInterval = setInterval(() => { this.timerSeconds++; }, 1000); },
+            async stopTimer() { clearInterval(this.timerInterval); this.timerRunning = false; this.timerSeconds = 0; },
+            async fetchAttendance() { const res = await fetch('/api/attendance'); const data = await res.json(); this.attendanceHours = data.total_hours; this.attendanceLogs = data.logs; },
             async addAttendance() {
                 if (!this.attEntry || !this.attExit) return alert("Please enter both times.");
-                
-                const res = await fetch('/api/attendance', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ 
-                        date: this.attDate,
-                        entry: this.attEntry, 
-                        exit: this.attExit 
-                    })
-                });
-
+                const res = await fetch('/api/attendance', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ date: this.attDate, entry: this.attEntry, exit: this.attExit }) });
                 const data = await res.json();
-
-                if (!res.ok) {
-                    // Show error (e.g., Weekend)
-                    alert(data.error || "Error logging time");
-                } else if (data.hours === 0) {
-                    alert("Logged, but 0 valid hours. (Outside 8am-6pm range?)");
-                    this.fetchAttendance(); 
-                } else {
-                    this.fetchAttendance(); 
-                }
-                
-                // Keep date, clear times for next entry
-                this.attEntry = '';
-                this.attExit = '';
+                if (!res.ok) alert(data.error || "Error");
+                else if (data.hours === 0) alert("Logged 0 hours (Check window/weekend).");
+                this.fetchAttendance(); this.attEntry = ''; this.attExit = '';
             }
         },
-        mounted() {
-            this.fetchTasks();
-            this.fetchAttendance(); 
-        }
+        mounted() { this.fetchTasks(); this.fetchAttendance(); }
     });
-
-    app.config.compilerOptions.delimiters = ['[[', ']]'];
     app.mount('#app');
 </script>
 </body>
