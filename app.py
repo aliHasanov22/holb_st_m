@@ -4,15 +4,12 @@ import re
 import json
 import secrets
 from datetime import datetime
-from typing import Optional, List
-from typing import Tuple  
-from typing import Tuple
+from typing import Optional, List, Tuple
 
 
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
 
 from sqlalchemy import (
     create_engine, Column, Integer, String, DateTime, ForeignKey, Text
@@ -334,6 +331,10 @@ def subject_page(request: Request, subject_id: int):
 
     db = SessionLocal()
     try:
+        token = request.cookies.get("session")
+        quiz_key = f"quiz:{token}:{subject_id}" if token else None
+        active_quiz = SESSIONS.get(quiz_key, []) if quiz_key else []
+
         subject = db.query(Subject).filter(Subject.id == subject_id, Subject.user_id == user_id).first()
         if not subject:
             return RedirectResponse("/dashboard", status_code=302)
@@ -346,6 +347,7 @@ def subject_page(request: Request, subject_id: int):
             "subject": subject,
             "notes": notes,
             "quiz_results": quiz_results,
+            "active_quiz": active_quiz,
             "use_openai": USE_OPENAI
         })
     finally:

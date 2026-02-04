@@ -37,25 +37,25 @@
         <input type="hidden" name="note_id" value="{{ n.id }}"/>
         <button type="submit">Start Quiz (from this note)</button>
       </form>
-
-      {% if request.query_params.get("quiz") %}
-        <hr/>
-        <form method="post" action="/subjects/{{ subject.id }}/quiz/submit">
-          <div><b>Answer 5 questions (type short answers)</b></div>
-          <div class="muted">Tip: This demo grades by keyword overlap.</div>
-          <br/>
-          <input name="a1" type="text" placeholder="Answer 1"/><br/><br/>
-          <input name="a2" type="text" placeholder="Answer 2"/><br/><br/>
-          <input name="a3" type="text" placeholder="Answer 3"/><br/><br/>
-          <input name="a4" type="text" placeholder="Answer 4"/><br/><br/>
-          <input name="a5" type="text" placeholder="Answer 5"/><br/><br/>
-          <button type="submit">Submit Quiz</button>
-        </form>
-      {% endif %}
     </div>
   {% else %}
     <p class="muted">No notes yet.</p>
   {% endfor %}
+
+  {% if request.query_params.get("quiz") and active_quiz %}
+    <div class="card">
+      <form method="post" action="/subjects/{{ subject.id }}/quiz/submit">
+        <div><b>Answer {{ active_quiz | length }} questions (type short answers)</b></div>
+        <div class="muted">Tip: This demo grades by keyword overlap.</div>
+        <br/>
+        {% for item in active_quiz %}
+          <div><b>Q{{ loop.index }}.</b> {{ item.q }}</div>
+          <input name="a{{ loop.index }}" type="text" placeholder="Answer {{ loop.index }}"/><br/><br/>
+        {% endfor %}
+        <button type="submit">Submit Quiz</button>
+      </form>
+    </div>
+  {% endif %}
 
   <h4>Recent quiz results</h4>
   {% for r in quiz_results %}
