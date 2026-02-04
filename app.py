@@ -3,6 +3,9 @@ from flask import Flask, jsonify, request, render_template
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta, time
 import math # <--- NEW: Needed for distance calculation
+import re
+import requests
+from bs4 import BeautifulSoup
 from sqlalchemy import func
 
 app = Flask(__name__)
@@ -22,7 +25,8 @@ class Task(db.Model):
     title = db.Column(db.String(100), nullable=False)
     priority = db.Column(db.String(20), default='Medium')
     status = db.Column(db.String(20), default='Pending')
-    due_date = db.Column(db.String(20), nullable=True)
+    start_date = db.Column(db.Date, nullable=True)
+    due_date = db.Column(db.Date, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
@@ -31,7 +35,8 @@ class Task(db.Model):
             'title': self.title,
             'priority': self.priority,
             'status': self.status,
-            'due_date': self.due_date
+            'start_date': self.start_date.strftime('%Y-%m-%d') if self.start_date else None,
+            'due_date': self.due_date.strftime('%Y-%m-%d') if self.due_date else None
         }
 
 class StudySession(db.Model):
@@ -57,6 +62,20 @@ class Attendance(db.Model):
             'entry': self.entry_time,
             'exit': self.exit_time,
             'hours': self.valid_hours
+        }
+
+class WeeklyTaskSummary(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    week_start = db.Column(db.Date, nullable=False, unique=True)
+    total_tasks = db.Column(db.Integer, nullable=False, default=0)
+    completed_tasks = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'week_start': self.week_start.strftime('%Y-%m-%d'),
+            'total_tasks': self.total_tasks,
+            'completed_tasks': self.completed_tasks
         }
 
 # --- HELPER: Calculate 8am-6pm Hours ---
@@ -102,6 +121,98 @@ def calculate_valid_hours(entry_str, exit_str):
     duration = dt_exit - dt_entry
     return round(duration.total_seconds() / 3600, 2) # Return hours
 
+def get_week_start(date_value):
+    return date_value - timedelta(days=date_value.weekday())
+
+def compute_weekly_task_summary(week_start):
+    week_end = week_start + timedelta(days=7)
+    tasks = Task.query.filter(
+        Task.created_at >= datetime.combine(week_start, time.min),
+        Task.created_at < datetime.combine(week_end, time.min)
+    ).all()
+    total_tasks = len(tasks)
+    completed_tasks = sum(1 for task in tasks if task.status == 'Completed')
+    return total_tasks, completed_tasks
+
+def ensure_weekly_summaries():
+    today = datetime.utcnow().date()
+    current_week_start = get_week_start(today)
+    latest_summary = WeeklyTaskSummary.query.order_by(WeeklyTaskSummary.week_start.desc()).first()
+
+    if latest_summary is None:
+        previous_week_start = current_week_start - timedelta(days=7)
+        total_tasks, completed_tasks = compute_weekly_task_summary(previous_week_start)
+        db.session.add(WeeklyTaskSummary(
+            week_start=previous_week_start,
+            total_tasks=total_tasks,
+            completed_tasks=completed_tasks
+        ))
+        db.session.commit()
+        return
+
+    next_week_start = latest_summary.week_start + timedelta(days=7)
+    if next_week_start >= current_week_start:
+        return
+
+    week_cursor = next_week_start
+    while week_cursor < current_week_start:
+        total_tasks, completed_tasks = compute_weekly_task_summary(week_cursor)
+        db.session.add(WeeklyTaskSummary(
+            week_start=week_cursor,
+            total_tasks=total_tasks,
+            completed_tasks=completed_tasks
+        ))
+        week_cursor += timedelta(days=7)
+    db.session.commit()
+
+def parse_project_deadline(deadline_text):
+    match = re.search(r'\d{4}-\d{2}-\d{2}', deadline_text)
+    if not match:
+        return None
+    return datetime.strptime(match.group(0), '%Y-%m-%d').date()
+
+def sync_holberton_projects(session_cookie):
+    url = "https://intranet.hbtn.io/projects/current"
+    headers = {'Cookie': f'_holberton_intranet_session={session_cookie}'}
+
+    response = requests.get(url, headers=headers, timeout=10)
+    if response.status_code != 200:
+        return None
+
+    soup = BeautifulSoup(response.text, 'html.parser')
+    projects = []
+
+    for project_div in soup.select('.list-group-item'):
+        name_el = project_div.select_one('h4')
+        deadline_el = project_div.select_one('.deadline')
+        if not name_el:
+            continue
+        name = name_el.text.strip()
+        deadline_raw = deadline_el.text.strip() if deadline_el else ''
+        projects.append({'title': name, 'deadline': deadline_raw})
+
+    return projects
+
+def fetch_intranet_stats(session_cookie):
+    url = "https://intranet.hbtn.io/users/my_profile"
+    headers = {'Cookie': f'_holberton_intranet_session={session_cookie}'}
+
+    response = requests.get(url, headers=headers, timeout=10)
+    if response.status_code != 200:
+        return None
+
+    soup = BeautifulSoup(response.text, 'html.parser')
+    stats_text = ' '.join(text.strip() for text in soup.stripped_strings)
+
+    def find_percent(label):
+        match = re.search(rf'{label}\s*[:\-]?\s*(\d+)%', stats_text, re.IGNORECASE)
+        return int(match.group(1)) if match else None
+
+    return {
+        'attendance': find_percent('Attendance'),
+        'average': find_percent('Average')
+    }
+
 # --- ROUTES ---
 @app.route('/')
 def index():
@@ -116,10 +227,17 @@ def get_tasks():
 @app.route('/api/tasks', methods=['POST'])
 def add_task():
     data = request.json
+    start_date = None
+    due_date = None
+    if data.get('start_date'):
+        start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
+    if data.get('due_date'):
+        due_date = datetime.strptime(data['due_date'], '%Y-%m-%d').date()
     new_task = Task(
         title=data['title'], 
         priority=data.get('priority', 'Medium'),
-        due_date=data.get('due_date')
+        start_date=start_date,
+        due_date=due_date
     )
     db.session.add(new_task)
     db.session.commit()
@@ -137,6 +255,70 @@ def task_stats():
     # Counts tasks by status
     stats = db.session.query(Task.status, func.count(Task.id)).group_by(Task.status).all()
     return jsonify(dict(stats))
+
+@app.route('/api/tasks/weekly-summary', methods=['GET'])
+def task_weekly_summary():
+    ensure_weekly_summaries()
+    summaries = WeeklyTaskSummary.query.order_by(WeeklyTaskSummary.week_start.asc()).all()
+
+    today = datetime.utcnow().date()
+    current_week_start = get_week_start(today)
+    total_tasks, completed_tasks = compute_weekly_task_summary(current_week_start)
+
+    response = [summary.to_dict() for summary in summaries]
+
+    if not summaries or summaries[-1].week_start != current_week_start:
+        response.append({
+            'week_start': current_week_start.strftime('%Y-%m-%d'),
+            'total_tasks': total_tasks,
+            'completed_tasks': completed_tasks
+        })
+
+    return jsonify(response)
+
+@app.route('/api/sync', methods=['POST'])
+def sync_projects():
+    data = request.json or {}
+    session_cookie = data.get('session_cookie')
+    if not session_cookie:
+        return jsonify({'error': 'Session cookie required.'}), 400
+
+    projects = sync_holberton_projects(session_cookie)
+    if projects is None:
+        return jsonify({'error': 'Failed to fetch projects.'}), 400
+
+    created = []
+    skipped = []
+
+    for project in projects:
+        title = project['title']
+        if Task.query.filter_by(title=title).first():
+            skipped.append(title)
+            continue
+        deadline_date = parse_project_deadline(project.get('deadline', ''))
+        new_task = Task(
+            title=title,
+            priority='High',
+            due_date=deadline_date
+        )
+        db.session.add(new_task)
+        created.append(title)
+
+    db.session.commit()
+    return jsonify({'created': created, 'skipped': skipped})
+
+@app.route('/api/intranet-stats', methods=['POST'])
+def intranet_stats():
+    data = request.json or {}
+    session_cookie = data.get('session_cookie')
+    if not session_cookie:
+        return jsonify({'error': 'Session cookie required.'}), 400
+
+    stats = fetch_intranet_stats(session_cookie)
+    if stats is None:
+        return jsonify({'error': 'Failed to fetch stats.'}), 400
+
+    return jsonify(stats)
 
 @app.route('/api/tasks/<int:id>', methods=['DELETE'])
 def delete_task(id):
@@ -190,7 +372,11 @@ def check_location():
 @app.route('/api/attendance', methods=['GET'])
 def get_attendance():
     # Get logs for the current week (Monday to Sunday)
-    today = datetime.utcnow().date()
+    date_str = request.args.get('date')
+    if date_str:
+        today = datetime.strptime(date_str, '%Y-%m-%d').date()
+    else:
+        today = datetime.utcnow().date()
     start_of_week = today - timedelta(days=today.weekday())
     
     # Sort by date descending (newest first)
@@ -219,6 +405,10 @@ def add_attendance():
     # 2. CHECK: Is it a weekday? (0=Mon, 4=Fri, 5=Sat, 6=Sun)
     if log_date.weekday() > 4:
         return jsonify({'error': 'Weekends do not count towards mandatory hours!'}), 400
+
+    existing_log = Attendance.query.filter_by(date=log_date).first()
+    if existing_log:
+        return jsonify({'error': 'Attendance already logged for this date.'}), 400
 
     # 3. Calculate hours (8am - 6pm logic)
     hours = calculate_valid_hours(data['entry'], data['exit'])
