@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="card">
+    <h3>Create subject</h3>
+    <form method="post" action="/subjects/create">
+      <input type="text" name="name" placeholder="e.g., SQL, Networking, Python" required/>
+      <br/><br/>
+      <button type="submit">Add</button>
+    </form>
+  </div>
+
+  <h3>Your subjects</h3>
+  {% for s in subjects %}
+    <div class="card">
+      <b>{{ s.name }}</b>
+      <div class="muted">Created: {{ s.created_at }}</div>
+      <br/>
+      <a href="/subjects/{{ s.id }}">Open</a>
+    </div>
+  {% else %}
+    <p class="muted">No subjects yet.</p>
+  {% endfor %}
+{% endblock %}
