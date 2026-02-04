@@ -246,8 +246,11 @@ def home(request: Request):
     return RedirectResponse("/dashboard", status_code=302)
 
 @app.get("/signup", response_class=HTMLResponse)
-def signup_page(request: Request):
-    return templates.TemplateResponse("signup.html", {"request": request, "error": None, "show_nav": False})
+def signup_page(request: Request, err: Optional[str] = None):
+    return templates.TemplateResponse(
+        "signup.html",
+        {"request": request, "error": err, "show_nav": False, "use_openai": USE_OPENAI},
+    )
 
 @app.post("/signup")
 def signup(email: str = Form(...), password: str = Form(...)):
@@ -268,7 +271,10 @@ def signup(email: str = Form(...), password: str = Form(...)):
 
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request, err: Optional[str] = None):
-    return templates.TemplateResponse("login.html", {"request": request, "error": err, "show_nav": False})
+    return templates.TemplateResponse(
+        "login.html",
+        {"request": request, "error": err, "show_nav": False, "use_openai": USE_OPENAI},
+    )
 
 @app.post("/login")
 def login(email: str = Form(...), password: str = Form(...)):
