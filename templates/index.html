@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Planner MVP</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; }
+        .completed { text-decoration: line-through; color: gray; }
+        .card { border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .priority-High { border-left: 5px solid #dc3545; }
+        .priority-Medium { border-left: 5px solid #ffc107; }
+        .priority-Low { border-left: 5px solid #0d6efd; }
+    </style>
+</head>
+<body>
+
+<div id="app" class="container mt-5" style="max-width: 600px;">
+    <h2 class="text-center mb-4">📚 Student Planner</h2>
+
+    <div class="card p-3 mb-4">
+        <div class="row g-2">
+            <div class="col-7">
+                <input v-model="newTask" @keyup.enter="addTask" type="text" class="form-control" placeholder="What needs to be done?">
+            </div>
+            <div class="col-3">
+                <select v-model="newPriority" class="form-select">
+                    <option>Low</option>
+                    <option>Medium</option>
+                    <option>High</option>
+                </select>
+            </div>
+            <div class="col-2">
+                <button @click="addTask" class="btn btn-primary w-100">+</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between mb-3 text-muted">
+        <span>Pending: {{ pendingCount }}</span>
+        <span>Completed: {{ completedCount }}</span>
+    </div>
+
+    <div v-for="task in tasks" :key="task.id" class="card mb-2 p-3 d-flex flex-row justify-content-between align-items-center" :class="'priority-' + task.priority">
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" :checked="task.status === 'Completed'" @change="toggleTask(task)">
+            <span :class="{ completed: task.status === 'Completed' }">{{ task.title }}</span>
+            <small class="text-muted d-block" style="font-size: 0.8rem;">{{ task.priority }} Priority</small>
+        </div>
+        <button @click="deleteTask(task.id)" class="btn btn-sm btn-outline-danger">×</button>
+    </div>
+</div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+<script>
+    const { createApp } = Vue;
+
+    createApp({
+        data() {
+            return {
+                tasks: [],
+                newTask: '',
+                newPriority: 'Medium'
+            }
+        },
+        computed: {
+            pendingCount() { return this.tasks.filter(t => t.status === 'Pending').length },
+            completedCount() { return this.tasks.filter(t => t.status === 'Completed').length }
+        },
+        methods: {
+            async fetchTasks() {
+                const res = await fetch('/api/tasks');
+                this.tasks = await res.json();
+            },
+            async addTask() {
+                if (!this.newTask) return;
+                const res = await fetch('/api/tasks', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ title: this.newTask, priority: this.newPriority })
+                });
+                this.tasks.unshift(await res.json());
+                this.newTask = '';
+            },
+            async toggleTask(task) {
+                const res = await fetch(`/api/tasks/${task.id}/toggle`, { method: 'PUT' });
+                const updated = await res.json();
+                task.status = updated.status;
+            },
+            async deleteTask(id) {
+                await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+                this.tasks = this.tasks.filter(t => t.id !== id);
+            }
+        },
+        mounted() {
+            this.fetchTasks();
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>
