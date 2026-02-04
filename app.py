@@ -126,13 +126,19 @@ def log_study_session():
     return jsonify(new_session.to_dict()), 201
 
 # NEW: Attendance Routes
+# --- UPDATED ATTENDANCE ROUTES ---
+
 @app.route('/api/attendance', methods=['GET'])
 def get_attendance():
-    # Get start of current week (Monday)
+    # Get logs for the current week (Monday to Sunday)
     today = datetime.utcnow().date()
     start_of_week = today - timedelta(days=today.weekday())
     
-    logs = Attendance.query.filter(Attendance.date >= start_of_week).all()
+    # Sort by date descending (newest first)
+    logs = Attendance.query.filter(Attendance.date >= start_of_week)\
+                           .order_by(Attendance.date.desc(), Attendance.entry_time.desc())\
+                           .all()
+    
     total_hours = sum(log.valid_hours for log in logs)
     
     return jsonify({
@@ -143,9 +149,23 @@ def get_attendance():
 @app.route('/api/attendance', methods=['POST'])
 def add_attendance():
     data = request.json
+    
+    # 1. Parse the date provided by the user
+    log_date_str = data.get('date') # Format YYYY-MM-DD
+    if log_date_str:
+        log_date = datetime.strptime(log_date_str, '%Y-%m-%d').date()
+    else:
+        log_date = datetime.utcnow().date()
+
+    # 2. CHECK: Is it a weekday? (0=Mon, 4=Fri, 5=Sat, 6=Sun)
+    if log_date.weekday() > 4:
+        return jsonify({'error': 'Weekends do not count towards mandatory hours!'}), 400
+
+    # 3. Calculate hours (8am - 6pm logic)
     hours = calculate_valid_hours(data['entry'], data['exit'])
     
     new_log = Attendance(
+        date=log_date,
         entry_time=data['entry'], 
         exit_time=data['exit'], 
         valid_hours=hours
