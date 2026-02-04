@@ -4,9 +4,7 @@ import re
 import json
 import secrets
 from datetime import datetime
-from typing import Optional, List
-from typing import Tuple  
-from typing import Tuple
+from typing import Optional, List, Tuple
 
 
 from fastapi import FastAPI, Request, Form
@@ -249,8 +247,8 @@ def home(request: Request):
     return RedirectResponse("/dashboard", status_code=302)
 
 @app.get("/signup", response_class=HTMLResponse)
-def signup_page(request: Request):
-    return templates.TemplateResponse("signup.html", {"request": request, "error": None})
+def signup_page(request: Request, err: Optional[str] = None):
+    return templates.TemplateResponse("signup.html", {"request": request, "error": err})
 
 @app.post("/signup")
 def signup(email: str = Form(...), password: str = Form(...)):
