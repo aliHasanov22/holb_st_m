@@ -23,6 +23,14 @@ class Task(db.Model):
             'priority': self.priority,
             'status': self.status
         }
+class StudySession(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    subject = db.Column(db.String(50), nullable=False)
+    duration_minutes = db.Column(db.Integer, nullable=False)
+    date = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return { 'subject': self.subject, 'duration': self.duration_minutes, 'date': self.date }
 
 # --- Routes (Frontend) ---
 @app.route('/')
@@ -56,6 +64,14 @@ def delete_task(id):
     db.session.delete(task)
     db.session.commit()
     return jsonify({'message': 'Deleted'})
+
+@app.route('/api/study', methods=['POST'])
+def log_study_session():
+    data = request.json
+    new_session = StudySession(subject=data['subject'], duration_minutes=data['duration'])
+    db.session.add(new_session)
+    db.session.commit()
+    return jsonify(new_session.to_dict()), 201
 
 # --- App Entry Point ---
 if __name__ == '__main__':
