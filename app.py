@@ -4,6 +4,8 @@ import json
 import secrets
 from datetime import datetime
 from typing import Optional, List
+from typing import Tuple  
+
 
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import RedirectResponse, HTMLResponse
@@ -162,7 +164,7 @@ def offline_flashcards(text: str, max_cards: int = 8) -> List[dict]:
             cards.append({"q": "Explain this:", "a": s})
     return cards[:max_cards]
 
-def ai_summary_and_flashcards(text: str) -> tuple[str, List[dict]]:
+def ai_summary_and_flashcards(text: str) -> Tuple[str, List[dict]]:
     # If OpenAI not set, fallback offline
     if not USE_OPENAI or oai_client is None:
         return offline_summary(text), offline_flashcards(text)
