@@ -1,12 +1,19 @@
 from flask import Flask, jsonify, request, render_template
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta, time
+import math # <--- NEW: Needed for distance calculation
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///planner.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
+# --- 📍 CONFIGURATION: SET YOUR CAMPUS LOCATION HERE ---
+# Example: Holberton School (Tulsa, OK coordinates as placeholder)
+# Go to Google Maps, right-click your campus, and copy the numbers.
+CAMPUS_LAT = 36.1539
+CAMPUS_LON = -95.9927
+MAX_DISTANCE_METERS = 200
 # --- MODELS ---
 class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -51,6 +58,20 @@ class Attendance(db.Model):
         }
 
 # --- HELPER: Calculate 8am-6pm Hours ---
+def get_distance_meters(lat1, lon1, lat2, lon2):
+    R = 6371000  # Radius of Earth in meters
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    delta_phi = math.radians(lat2 - lat1)
+    delta_lambda = math.radians(lon2 - lon1)
+
+    a = math.sin(delta_phi / 2)**2 + \
+        math.cos(phi1) * math.cos(phi2) * \
+        math.sin(delta_lambda / 2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+    return R * c
+    
 def calculate_valid_hours(entry_str, exit_str):
     # Limits
     START_LIMIT = time(8, 0)  # 08:00 AM
@@ -125,6 +146,36 @@ def log_study_session():
     db.session.commit()
     return jsonify(new_session.to_dict()), 201
 
+# --- NEW ROUTE: GPS CHECK ---
+@app.route('/api/attendance/check-location', methods=['POST'])
+def check_location():
+    data = request.json
+    user_lat = data.get('lat')
+    user_lon = data.get('lon')
+
+    if user_lat is None or user_lon is None:
+        return jsonify({'error': 'No coordinates provided'}), 400
+
+    # Calculate distance
+    dist = get_distance_meters(user_lat, user_lon, CAMPUS_LAT, CAMPUS_LON)
+    
+    if dist <= MAX_DISTANCE_METERS:
+        # User is ON CAMPUS
+        now_time = datetime.now().strftime('%H:%M')
+        return jsonify({
+            'status': 'allowed', 
+            'distance': round(dist, 2),
+            'time': now_time,
+            'message': f'✅ Access Granted! You are {int(dist)}m from campus.'
+        })
+    else:
+        # User is TOO FAR
+        return jsonify({
+            'status': 'denied', 
+            'distance': round(dist, 2),
+            'message': f'❌ Too far! You are {int(dist)}m away. Go to campus.'
+        }), 403
+
 # NEW: Attendance Routes
 # --- UPDATED ATTENDANCE ROUTES ---
 
@@ -173,6 +224,7 @@ def add_attendance():
     db.session.add(new_log)
     db.session.commit()
     return jsonify(new_log.to_dict())
+
 
 if __name__ == '__main__':
     with app.app_context():
