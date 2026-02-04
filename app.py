@@ -12,8 +12,9 @@ db = SQLAlchemy(app)
 class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100), nullable=False)
-    priority = db.Column(db.String(20), default='Medium') # Low, Medium, High
-    status = db.Column(db.String(20), default='Pending') # Pending, Completed
+    priority = db.Column(db.String(20), default='Medium')
+    status = db.Column(db.String(20), default='Pending')
+    due_date = db.Column(db.String(20), nullable=True) # NEW COLUMN
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
@@ -21,16 +22,18 @@ class Task(db.Model):
             'id': self.id,
             'title': self.title,
             'priority': self.priority,
-            'status': self.status
+            'status': self.status,
+            'due_date': self.due_date # Return this to frontend
         }
-class StudySession(db.Model):
+
+class StudySession(db.Model): # NEW TABLE
     id = db.Column(db.Integer, primary_key=True)
     subject = db.Column(db.String(50), nullable=False)
     duration_minutes = db.Column(db.Integer, nullable=False)
     date = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
-        return { 'subject': self.subject, 'duration': self.duration_minutes, 'date': self.date }
+        return { 'subject': self.subject, 'duration': self.duration_minutes }
 
 # --- Routes (Frontend) ---
 @app.route('/')
