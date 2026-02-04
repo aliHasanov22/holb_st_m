@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 import os
 import re
 import json
@@ -5,6 +6,7 @@ import secrets
 from datetime import datetime
 from typing import Optional, List
 from typing import Tuple  
+from typing import Tuple
 
 
 from fastapi import FastAPI, Request, Form
@@ -225,7 +227,7 @@ def build_quiz(flashcards: List[dict], limit: int = 5) -> List[dict]:
         quiz.append({"q": c["q"], "expected": c["a"]})
     return quiz
 
-def grade_quiz(quiz: List[dict], user_answers: List[str]) -> tuple[int, int]:
+def grade_quiz(quiz: List[dict], user_answers: List[str]) -> Tuple[int, int]:
     score = 0
     for item, ans in zip(quiz, user_answers):
         expected = item["expected"].lower()
