@@ -1,7 +1,9 @@
+#!/usr/bin/python3
 from flask import Flask, jsonify, request, render_template
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta, time
 import math # <--- NEW: Needed for distance calculation
+from sqlalchemy import func
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///planner.db'
@@ -129,6 +131,12 @@ def toggle_task(id):
     task.status = 'Completed' if task.status == 'Pending' else 'Pending'
     db.session.commit()
     return jsonify(task.to_dict())
+
+@app.route('/api/stats/tasks', methods=['GET'])
+def task_stats():
+    # Counts tasks by status
+    stats = db.session.query(Task.status, func.count(Task.id)).group_by(Task.status).all()
+    return jsonify(dict(stats))
 
 @app.route('/api/tasks/<int:id>', methods=['DELETE'])
 def delete_task(id):
