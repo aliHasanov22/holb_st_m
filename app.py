@@ -22,6 +22,7 @@ class Task(db.Model):
     title = db.Column(db.String(100), nullable=False)
     priority = db.Column(db.String(20), default='Medium')
     status = db.Column(db.String(20), default='Pending')
+    start_date = db.Column(db.String(20), nullable=True)
     due_date = db.Column(db.String(20), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -31,6 +32,7 @@ class Task(db.Model):
             'title': self.title,
             'priority': self.priority,
             'status': self.status,
+            'start_date': self.start_date,
             'due_date': self.due_date
         }
 
@@ -57,6 +59,20 @@ class Attendance(db.Model):
             'entry': self.entry_time,
             'exit': self.exit_time,
             'hours': self.valid_hours
+        }
+
+class WeeklyTaskSummary(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    week_start = db.Column(db.Date, nullable=False, unique=True)
+    total_tasks = db.Column(db.Integer, nullable=False, default=0)
+    completed_tasks = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'week_start': self.week_start.strftime('%Y-%m-%d'),
+            'total_tasks': self.total_tasks,
+            'completed_tasks': self.completed_tasks
         }
 
 # --- HELPER: Calculate 8am-6pm Hours ---
@@ -102,6 +118,50 @@ def calculate_valid_hours(entry_str, exit_str):
     duration = dt_exit - dt_entry
     return round(duration.total_seconds() / 3600, 2) # Return hours
 
+def get_week_start(date_value):
+    return date_value - timedelta(days=date_value.weekday())
+
+def compute_weekly_task_summary(week_start):
+    week_end = week_start + timedelta(days=7)
+    tasks = Task.query.filter(
+        Task.created_at >= datetime.combine(week_start, time.min),
+        Task.created_at < datetime.combine(week_end, time.min)
+    ).all()
+    total_tasks = len(tasks)
+    completed_tasks = sum(1 for task in tasks if task.status == 'Completed')
+    return total_tasks, completed_tasks
+
+def ensure_weekly_summaries():
+    today = datetime.utcnow().date()
+    current_week_start = get_week_start(today)
+    latest_summary = WeeklyTaskSummary.query.order_by(WeeklyTaskSummary.week_start.desc()).first()
+
+    if latest_summary is None:
+        previous_week_start = current_week_start - timedelta(days=7)
+        total_tasks, completed_tasks = compute_weekly_task_summary(previous_week_start)
+        db.session.add(WeeklyTaskSummary(
+            week_start=previous_week_start,
+            total_tasks=total_tasks,
+            completed_tasks=completed_tasks
+        ))
+        db.session.commit()
+        return
+
+    next_week_start = latest_summary.week_start + timedelta(days=7)
+    if next_week_start >= current_week_start:
+        return
+
+    week_cursor = next_week_start
+    while week_cursor < current_week_start:
+        total_tasks, completed_tasks = compute_weekly_task_summary(week_cursor)
+        db.session.add(WeeklyTaskSummary(
+            week_start=week_cursor,
+            total_tasks=total_tasks,
+            completed_tasks=completed_tasks
+        ))
+        week_cursor += timedelta(days=7)
+    db.session.commit()
+
 # --- ROUTES ---
 @app.route('/')
 def index():
@@ -119,6 +179,7 @@ def add_task():
     new_task = Task(
         title=data['title'], 
         priority=data.get('priority', 'Medium'),
+        start_date=data.get('start_date'),
         due_date=data.get('due_date')
     )
     db.session.add(new_task)
@@ -137,6 +198,26 @@ def task_stats():
     # Counts tasks by status
     stats = db.session.query(Task.status, func.count(Task.id)).group_by(Task.status).all()
     return jsonify(dict(stats))
+
+@app.route('/api/tasks/weekly-summary', methods=['GET'])
+def task_weekly_summary():
+    ensure_weekly_summaries()
+    summaries = WeeklyTaskSummary.query.order_by(WeeklyTaskSummary.week_start.asc()).all()
+
+    today = datetime.utcnow().date()
+    current_week_start = get_week_start(today)
+    total_tasks, completed_tasks = compute_weekly_task_summary(current_week_start)
+
+    response = [summary.to_dict() for summary in summaries]
+
+    if not summaries or summaries[-1].week_start != current_week_start:
+        response.append({
+            'week_start': current_week_start.strftime('%Y-%m-%d'),
+            'total_tasks': total_tasks,
+            'completed_tasks': completed_tasks
+        })
+
+    return jsonify(response)
 
 @app.route('/api/tasks/<int:id>', methods=['DELETE'])
 def delete_task(id):

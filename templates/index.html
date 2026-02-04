@@ -7,6 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <style>
         /* --- THEME VARIABLES --- */
@@ -69,7 +70,7 @@
 
         /* Timer Display */
         .timer-display {
-            font-size: 2.5rem;
+            font-size: 3.5rem;
             font-weight: bold;
             color: var(--text-main);
             /* Only glow in dark mode */
@@ -108,6 +109,7 @@
         /* GPS Pulse Animation */
         @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(224, 0, 52, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(224, 0, 52, 0); } 100% { box-shadow: 0 0 0 0 rgba(224, 0, 52, 0); } }
         .gps-active { animation: pulse 2s infinite; }
+        .form-helper { font-size: 0.8rem; color: #9aa0a6; }
     </style>
 </head>
 <body>
@@ -149,11 +151,24 @@
             </div>
 
             <div class="card p-3 mb-4">
-                <h6 class="text-secondary text-uppercase mb-3 small fw-bold">New Ticket</h6>
-                <div class="row g-2">
-                    <div class="col-6"><input v-model="newTask" @keyup.enter="addTask" type="text" class="form-control" placeholder="Task description..."></div>
-                    <div class="col-4"><input v-model="newDueDate" type="date" class="form-control"></div>
-                    <div class="col-2"><button @click="addTask" class="btn btn-light border w-100 fw-bold">Add</button></div>
+                <h6 class="text-secondary text-uppercase mb-2 small fw-bold">Add Task</h6>
+                <p class="form-helper mb-3">Plan your week by adding a task with a start date and deadline.</p>
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-5">
+                        <label class="small text-muted">Task</label>
+                        <input v-model="newTask" @keyup.enter="addTask" type="text" class="form-control" placeholder="e.g. Finish project README">
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="small text-muted">Start</label>
+                        <input v-model="newStartDate" type="date" class="form-control">
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="small text-muted">Deadline</label>
+                        <input v-model="newDueDate" type="date" class="form-control">
+                    </div>
+                    <div class="col-12 col-md-1">
+                        <button @click="addTask" class="btn btn-light border w-100 fw-bold">Add</button>
+                    </div>
                 </div>
             </div>
 
@@ -161,6 +176,11 @@
                 <div>
                     <input class="form-check-input me-3 border-secondary" type="checkbox" :checked="task.status === 'Completed'" @change="toggleTask(task)">
                     <span :class="{ 'text-decoration-line-through text-muted': task.status === 'Completed', 'fw-bold': true }">{{ task.title }}</span>
+                    <div class="small text-muted mt-1" v-if="task.start_date || task.due_date">
+                        <span v-if="task.start_date">Start {{ task.start_date }}</span>
+                        <span v-if="task.start_date && task.due_date"> · </span>
+                        <span v-if="task.due_date">Deadline {{ task.due_date }}</span>
+                    </div>
                 </div>
                 <button @click="deleteTask(task.id)" class="btn btn-sm btn-link text-secondary"><i class="fas fa-trash"></i></button>
             </div>
@@ -169,8 +189,11 @@
         <div class="col-lg-5">
 
             <div class="card p-3 mb-4">
-                <h6 class="text-secondary small text-uppercase mb-3">Task Completion</h6>
-                <canvas id="taskChart" width="400" height="400"></canvas>
+                <h6 class="text-secondary small text-uppercase mb-1">Task Completion</h6>
+                <p class="form-helper mb-3">Weekly progress for tasks created at the start of each week.</p>
+                <div style="height: 260px;">
+                    <canvas id="taskChart"></canvas>
+                </div>
             </div>
 
             <div class="card p-4 mb-4">
@@ -240,7 +263,7 @@
         data() {
             return {
                 isDarkMode: true, // Default state
-                tasks: [], newTask: '', newPriority: 'Medium', newDueDate: '',
+                tasks: [], newTask: '', newPriority: 'Medium', newStartDate: '', newDueDate: '',
                 studySubject: '', timerSeconds: 0, timerRunning: false, timerInterval: null,
                 attEntry: '', attExit: '', attendanceHours: 0, attendanceLogs: [],
                 gpsLoading: false
@@ -258,12 +281,14 @@
             // Inside your Vue methods
             async renderChart() {
                 try {
-                    const res = await fetch('/api/tasks');
-                    const tasks = await res.json();
-
-                    // Count statuses manually if you haven't added the /api/stats endpoint yet
-                    const completed = tasks.filter(t => t.status === 'Completed').length;
-                    const pending = tasks.filter(t => t.status === 'Pending').length;
+                    const res = await fetch('/api/tasks/weekly-summary');
+                    const summaries = await res.json();
+                    const labels = summaries.map(summary => {
+                        const [year, month, day] = summary.week_start.split('-');
+                        return `${month}/${day}`;
+                    });
+                    const completedData = summaries.map(summary => summary.completed_tasks);
+                    const pendingData = summaries.map(summary => summary.total_tasks - summary.completed_tasks);
 
                     const ctx = document.getElementById('taskChart');
                     if (!ctx) return;
@@ -272,20 +297,28 @@
                     if (window.myChart) window.myChart.destroy();
 
                     window.myChart = new Chart(ctx, {
-                        type: 'doughnut',
+                        type: 'bar',
                         data: {
-                            labels: ['Completed', 'Pending'],
+                            labels,
                             datasets: [{
-                                data: [completed, pending],
-                                backgroundColor: ['#198754', '#e00034'],
-                                hoverOffset: 4
+                                label: 'Completed',
+                                data: completedData,
+                                backgroundColor: '#198754'
+                            }, {
+                                label: 'Pending',
+                                data: pendingData,
+                                backgroundColor: '#e00034'
                             }]
                         },
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
+                            scales: {
+                                x: { stacked: true, ticks: { color: this.isDarkMode ? '#e0e0e0' : '#212529' } },
+                                y: { stacked: true, ticks: { color: this.isDarkMode ? '#e0e0e0' : '#212529' }, beginAtZero: true }
+                            },
                             plugins: {
-                                legend: { position: 'bottom', labels: { color: '#e0e0e0' } }
+                                legend: { position: 'bottom', labels: { color: this.isDarkMode ? '#e0e0e0' : '#212529' } }
                             }
                         }
                     });
@@ -305,6 +338,7 @@
                     htmlEl.setAttribute('data-bs-theme', 'light');
                     localStorage.setItem('theme', 'light');
                 }
+                this.renderChart();
             },
             loadTheme() {
                 const savedTheme = localStorage.getItem('theme');
@@ -330,9 +364,9 @@
                 }, () => { this.gpsLoading = false; alert("GPS Error."); });
             },
             async fetchTasks() { const res = await fetch('/api/tasks'); this.tasks = await res.json(); },
-            async addTask() { if (!this.newTask) return; const res = await fetch('/api/tasks', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ title: this.newTask, priority: 'Medium', due_date: this.newDueDate }) }); this.tasks.unshift(await res.json()); this.newTask = ''; },
-            async toggleTask(task) { const res = await fetch(`/api/tasks/${task.id}/toggle`, { method: 'PUT' }); task.status = (await res.json()).status; },
-            async deleteTask(id) { await fetch(`/api/tasks/${id}`, { method: 'DELETE' }); this.tasks = this.tasks.filter(t => t.id !== id); },
+            async addTask() { if (!this.newTask) return; const res = await fetch('/api/tasks', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ title: this.newTask, priority: 'Medium', start_date: this.newStartDate, due_date: this.newDueDate }) }); this.tasks.unshift(await res.json()); this.newTask = ''; this.newStartDate = ''; this.newDueDate = ''; this.renderChart(); },
+            async toggleTask(task) { const res = await fetch(`/api/tasks/${task.id}/toggle`, { method: 'PUT' }); task.status = (await res.json()).status; this.renderChart(); },
+            async deleteTask(id) { await fetch(`/api/tasks/${id}`, { method: 'DELETE' }); this.tasks = this.tasks.filter(t => t.id !== id); this.renderChart(); },
             startTimer() { this.timerRunning = true; this.timerInterval = setInterval(() => { this.timerSeconds++; }, 1000); },
             async stopTimer() { clearInterval(this.timerInterval); this.timerRunning = false; this.timerSeconds = 0; },
             async fetchAttendance() { const res = await fetch('/api/attendance'); const data = await res.json(); this.attendanceHours = data.total_hours; this.attendanceLogs = data.logs; },
