@@ -22,8 +22,8 @@ class Task(db.Model):
     title = db.Column(db.String(100), nullable=False)
     priority = db.Column(db.String(20), default='Medium')
     status = db.Column(db.String(20), default='Pending')
-    start_date = db.Column(db.String(20), nullable=True)
-    due_date = db.Column(db.String(20), nullable=True)
+    start_date = db.Column(db.Date, nullable=True)
+    due_date = db.Column(db.Date, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
@@ -32,8 +32,8 @@ class Task(db.Model):
             'title': self.title,
             'priority': self.priority,
             'status': self.status,
-            'start_date': self.start_date,
-            'due_date': self.due_date
+            'start_date': self.start_date.strftime('%Y-%m-%d') if self.start_date else None,
+            'due_date': self.due_date.strftime('%Y-%m-%d') if self.due_date else None
         }
 
 class StudySession(db.Model):
@@ -176,11 +176,17 @@ def get_tasks():
 @app.route('/api/tasks', methods=['POST'])
 def add_task():
     data = request.json
+    start_date = None
+    due_date = None
+    if data.get('start_date'):
+        start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
+    if data.get('due_date'):
+        due_date = datetime.strptime(data['due_date'], '%Y-%m-%d').date()
     new_task = Task(
         title=data['title'], 
         priority=data.get('priority', 'Medium'),
-        start_date=data.get('start_date'),
-        due_date=data.get('due_date')
+        start_date=start_date,
+        due_date=due_date
     )
     db.session.add(new_task)
     db.session.commit()
@@ -271,7 +277,11 @@ def check_location():
 @app.route('/api/attendance', methods=['GET'])
 def get_attendance():
     # Get logs for the current week (Monday to Sunday)
-    today = datetime.utcnow().date()
+    date_str = request.args.get('date')
+    if date_str:
+        today = datetime.strptime(date_str, '%Y-%m-%d').date()
+    else:
+        today = datetime.utcnow().date()
     start_of_week = today - timedelta(days=today.weekday())
     
     # Sort by date descending (newest first)
@@ -300,6 +310,10 @@ def add_attendance():
     # 2. CHECK: Is it a weekday? (0=Mon, 4=Fri, 5=Sat, 6=Sun)
     if log_date.weekday() > 4:
         return jsonify({'error': 'Weekends do not count towards mandatory hours!'}), 400
+
+    existing_log = Attendance.query.filter_by(date=log_date).first()
+    if existing_log:
+        return jsonify({'error': 'Attendance already logged for this date.'}), 400
 
     # 3. Calculate hours (8am - 6pm logic)
     hours = calculate_valid_hours(data['entry'], data['exit'])

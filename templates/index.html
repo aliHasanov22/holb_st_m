@@ -158,11 +158,19 @@
                         <label class="small text-muted">Task</label>
                         <input v-model="newTask" @keyup.enter="addTask" type="text" class="form-control" placeholder="e.g. Finish project README">
                     </div>
-                    <div class="col-6 col-md-3">
+                    <div class="col-6 col-md-2">
+                        <label class="small text-muted">Priority</label>
+                        <select v-model="newPriority" class="form-select">
+                            <option>High</option>
+                            <option>Medium</option>
+                            <option>Low</option>
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-2">
                         <label class="small text-muted">Start</label>
                         <input v-model="newStartDate" type="date" class="form-control">
                     </div>
-                    <div class="col-6 col-md-3">
+                    <div class="col-6 col-md-2">
                         <label class="small text-muted">Deadline</label>
                         <input v-model="newDueDate" type="date" class="form-control">
                     </div>
@@ -352,13 +360,13 @@
                 }, () => { this.gpsLoading = false; alert("GPS Error."); });
             },
             async fetchTasks() { const res = await fetch('/api/tasks'); this.tasks = await res.json(); },
-            async addTask() { if (!this.newTask) return; const res = await fetch('/api/tasks', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ title: this.newTask, priority: 'Medium', start_date: this.newStartDate, due_date: this.newDueDate }) }); this.tasks.unshift(await res.json()); this.newTask = ''; this.newStartDate = ''; this.newDueDate = ''; this.renderChart(); },
-            async toggleTask(task) { const res = await fetch(`/api/tasks/${task.id}/toggle`, { method: 'PUT' }); task.status = (await res.json()).status; this.renderChart(); },
+            async addTask() { if (!this.newTask) return; const res = await fetch('/api/tasks', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ title: this.newTask, priority: this.newPriority, start_date: this.newStartDate, due_date: this.newDueDate }) }); this.tasks.unshift(await res.json()); this.newTask = ''; this.newPriority = 'Medium'; this.newStartDate = ''; this.newDueDate = ''; this.renderChart(); },
+            async toggleTask(task) { const res = await fetch(`/api/tasks/${task.id}/toggle`, { method: 'PUT' }); const updatedTask = await res.json(); task.status = updatedTask.status; task.priority = updatedTask.priority; task.start_date = updatedTask.start_date; task.due_date = updatedTask.due_date; this.renderChart(); },
             async deleteTask(id) { await fetch(`/api/tasks/${id}`, { method: 'DELETE' }); this.tasks = this.tasks.filter(t => t.id !== id); this.renderChart(); },
             startTimer() { this.timerRunning = true; this.timerInterval = setInterval(() => { this.timerSeconds++; }, 1000); },
             async stopTimer() { clearInterval(this.timerInterval); this.timerRunning = false; this.timerSeconds = 0; },
-            async fetchAttendance() { const res = await fetch('/api/attendance'); const data = await res.json(); this.attendanceHours = data.total_hours; this.attendanceLogs = data.logs; },
-            async addAttendance() { if (!this.attEntry || !this.attExit) return alert("Enter both times."); const res = await fetch('/api/attendance', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ entry: this.attEntry, exit: this.attExit }) }); const data = await res.json(); if (!res.ok) alert(data.error); else { this.fetchAttendance(); this.attEntry = ''; this.attExit = ''; } }
+            async fetchAttendance() { const today = new Date(); const localDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`; const res = await fetch(`/api/attendance?date=${localDate}`); const data = await res.json(); this.attendanceHours = data.total_hours; this.attendanceLogs = data.logs; },
+            async addAttendance() { if (!this.attEntry || !this.attExit) return alert("Enter both times."); const today = new Date(); const localDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`; const res = await fetch('/api/attendance', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ entry: this.attEntry, exit: this.attExit, date: localDate }) }); const data = await res.json(); if (!res.ok) alert(data.error); else { this.fetchAttendance(); this.attEntry = ''; this.attExit = ''; } }
         },
         mounted() {
             this.loadTheme(); // <-- LOAD THEME ON STARTUP
