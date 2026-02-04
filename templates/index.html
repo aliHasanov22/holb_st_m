@@ -14,16 +14,18 @@
         .priority-Medium { border-left: 5px solid #ffc107; }
         .priority-Low { border-left: 5px solid #0d6efd; }
         .timer-display { font-family: 'Courier New', Courier, monospace; font-weight: bold; font-size: 2rem; }
+        /* Table Styles */
+        .table-sm td, .table-sm th { font-size: 0.85rem; vertical-align: middle; }
     </style>
 </head>
 <body>
 
 {% raw %}
-<div id="app" class="container mt-4" style="max-width: 900px;">
+<div id="app" class="container mt-4" style="max-width: 950px;">
     
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>🎓 Student Planner</h2>
-        <span class="badge bg-dark">v1.1</span>
+        <span class="badge bg-dark">v1.2</span>
     </div>
 
     <div class="row">
@@ -62,27 +64,31 @@
             
             <div class="card p-4 mb-4">
                 <h5 class="text-dark"><i class="fas fa-university me-2"></i>Campus Attendance</h5>
-                <p class="text-muted small mb-2">Only 08:00 - 18:00 counts.</p>
+                <p class="text-muted small mb-2">Weekdays 08:00 - 18:00 only.</p>
 
-                <div class="row g-2 mb-3">
-                    <div class="col-6">
-                        <label class="small">Entry</label>
-                        <input v-model="attEntry" type="time" class="form-control">
+                <div class="bg-light p-3 rounded mb-3">
+                    <div class="mb-2">
+                        <label class="small text-muted">Date</label>
+                        <input v-model="attDate" type="date" class="form-control form-control-sm">
                     </div>
-                    <div class="col-6">
-                        <label class="small">Exit</label>
-                        <input v-model="attExit" type="time" class="form-control">
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="small text-muted">Entry</label>
+                            <input v-model="attEntry" type="time" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-6">
+                            <label class="small text-muted">Exit</label>
+                            <input v-model="attExit" type="time" class="form-control form-control-sm">
+                        </div>
                     </div>
-                    <div class="col-12">
-                        <button @click="addAttendance" class="btn btn-outline-dark w-100 btn-sm">Log Attendance</button>
-                    </div>
+                    <button @click="addAttendance" class="btn btn-dark w-100 btn-sm">Log Time</button>
                 </div>
 
-                <label class="fw-bold d-flex justify-content-between">
+                <label class="fw-bold d-flex justify-content-between small mb-1">
                     <span>Weekly Progress</span>
                     <span>{{ attendanceHours }} / 15 hrs</span>
                 </label>
-                <div class="progress mb-2" style="height: 20px;">
+                <div class="progress mb-3" style="height: 15px;">
                     <div class="progress-bar" 
                          :class="attendanceHours >= 15 ? 'bg-success' : 'bg-warning'" 
                          role="progressbar" 
@@ -90,17 +96,32 @@
                     </div>
                 </div>
 
-                <div v-if="attendanceHours < 15" class="alert alert-danger py-2 small">
-                    <i class="fas fa-exclamation-triangle me-1"></i> 
-                    You need <b>{{ (15 - attendanceHours).toFixed(1) }}</b> more hours this week to meet the mandatory requirement!
+                <h6 class="border-bottom pb-2">This Week's Logs</h6>
+                <div style="max-height: 200px; overflow-y: auto;">
+                    <table class="table table-sm table-hover text-center">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Valid Hrs</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="log in attendanceLogs" :key="log.date + log.entry">
+                                <td>{{ log.date.slice(5) }}</td> <td class="small text-muted">{{ log.entry }} - {{ log.exit }}</td>
+                                <td class="fw-bold text-success">{{ log.hours }}</td>
+                            </tr>
+                            <tr v-if="attendanceLogs.length === 0">
+                                <td colspan="3" class="text-muted small">No logs yet this week.</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
-                <div v-else class="alert alert-success py-2 small">
-                    <i class="fas fa-check-circle me-1"></i> Requirement met!
-                </div>
-            </div>
 
-            <div v-if="pendingCount > 0" class="alert" :class="workloadClass" role="alert">
-                {{ workloadMessage }}
+                <div v-if="attendanceHours < 15" class="alert alert-danger py-2 small mt-2">
+                    <i class="fas fa-exclamation-triangle me-1"></i> 
+                    Missing <b>{{ (15 - attendanceHours).toFixed(1) }}</b> hours.
+                </div>
             </div>
 
         </div>
@@ -120,9 +141,11 @@
                 studySubject: '', timerSeconds: 0, timerRunning: false, timerInterval: null,
                 
                 // Attendance Data
+                attDate: new Date().toISOString().split('T')[0], // Default to Today
                 attEntry: '',
                 attExit: '',
-                attendanceHours: 0
+                attendanceHours: 0,
+                attendanceLogs: [] // Stores the history list
             }
         },
         computed: {
@@ -132,14 +155,6 @@
                 const secs = (this.timerSeconds % 60).toString().padStart(2, '0');
                 return `${mins}:${secs}`;
             },
-            workloadMessage() {
-                if (this.pendingCount > 8) return "⚠️ High Workload!";
-                return "Workload Manageable";
-            },
-            workloadClass() {
-                return this.pendingCount > 8 ? "alert-danger" : "alert-success";
-            },
-            // Calculate % for progress bar (max 100%)
             attendancePercent() {
                 return Math.min(100, (this.attendanceHours / 15) * 100);
             }
@@ -167,7 +182,6 @@
                 await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
                 this.tasks = this.tasks.filter(t => t.id !== id);
             },
-            // Timer Methods
             startTimer() {
                 this.timerRunning = true;
                 this.timerInterval = setInterval(() => { this.timerSeconds++; }, 1000);
@@ -177,11 +191,13 @@
                 this.timerRunning = false;
                 this.timerSeconds = 0;
             },
+            
             // --- ATTENDANCE METHODS ---
             async fetchAttendance() {
                 const res = await fetch('/api/attendance');
                 const data = await res.json();
                 this.attendanceHours = data.total_hours;
+                this.attendanceLogs = data.logs; // Save logs for the table
             },
             async addAttendance() {
                 if (!this.attEntry || !this.attExit) return alert("Please enter both times.");
@@ -189,23 +205,33 @@
                 const res = await fetch('/api/attendance', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ entry: this.attEntry, exit: this.attExit })
+                    body: JSON.stringify({ 
+                        date: this.attDate,
+                        entry: this.attEntry, 
+                        exit: this.attExit 
+                    })
                 });
+
                 const data = await res.json();
-                
-                if (data.hours === 0) {
-                    alert("No valid hours logged! (Must be between 08:00 and 18:00)");
+
+                if (!res.ok) {
+                    // Show error (e.g., Weekend)
+                    alert(data.error || "Error logging time");
+                } else if (data.hours === 0) {
+                    alert("Logged, but 0 valid hours. (Outside 8am-6pm range?)");
+                    this.fetchAttendance(); 
                 } else {
-                    alert(`Logged ${data.hours} valid hours.`);
-                    this.fetchAttendance(); // Refresh stats
+                    this.fetchAttendance(); 
                 }
+                
+                // Keep date, clear times for next entry
                 this.attEntry = '';
                 this.attExit = '';
             }
         },
         mounted() {
             this.fetchTasks();
-            this.fetchAttendance(); // Load attendance on startup
+            this.fetchAttendance(); 
         }
     });
 
