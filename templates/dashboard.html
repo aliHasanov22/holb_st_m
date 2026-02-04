@@ -1,23 +1,43 @@
 {% extends "base.html" %}
 {% block content %}
-  <div class="card">
-    <h3>Create subject</h3>
-    <form method="post" action="/subjects/create">
-      <input type="text" name="name" placeholder="e.g., SQL, Networking, Python" required/>
-      <br/><br/>
-      <button type="submit">Add</button>
-    </form>
+  <div class="split">
+    <div class="card">
+      <h3>Create a new subject</h3>
+      <p class="muted">Group related notes together (e.g., SQL, Networking, Python).</p>
+      <form method="post" action="/subjects/create">
+        <input type="text" name="name" placeholder="Subject name" required/>
+        <br/><br/>
+        <button type="submit">Add subject</button>
+      </form>
+    </div>
+    <div class="card">
+      <h3>Quick tips</h3>
+      <ul class="muted" style="margin:0;padding-left:18px;">
+        <li>Paste lecture notes or reading highlights.</li>
+        <li>Generate summaries and flashcards automatically.</li>
+        <li>Quiz yourself to reinforce memory.</li>
+      </ul>
+    </div>
   </div>
 
-  <h3>Your subjects</h3>
+  <h3 class="section-title">Your subjects</h3>
   {% for s in subjects %}
     <div class="card">
-      <b>{{ s.name }}</b>
-      <div class="muted">Created: {{ s.created_at }}</div>
-      <br/>
-      <a href="/subjects/{{ s.id }}">Open</a>
+      <div class="row" style="align-items:center;">
+        <div class="col">
+          <b style="font-size:16px;">{{ s.name }}</b>
+          <div class="muted">Created: {{ s.created_at }}</div>
+        </div>
+        <div>
+          <a href="/subjects/{{ s.id }}">
+            <button class="secondary" type="button">Open</button>
+          </a>
+        </div>
+      </div>
     </div>
   {% else %}
-    <p class="muted">No subjects yet.</p>
+    <div class="card">
+      <p class="muted">No subjects yet. Create one to start adding notes.</p>
+    </div>
   {% endfor %}
 {% endblock %}

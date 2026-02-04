@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
-  <h3>{{ subject.name }}</h3>
+  <div class="row" style="align-items:center;">
+    <div class="col">
+      <h3 style="margin-bottom:4px;">{{ subject.name }}</h3>
+      <div class="muted">Capture notes, summaries, flashcards, and quizzes in one place.</div>
+    </div>
+  </div>
 
   {% if request.query_params.get("sc") %}
     <div class="card">
@@ -20,7 +25,7 @@
     </div>
   </div>
 
-  <h4>Notes</h4>
+  <h4 class="section-title">Notes</h4>
   {% for n in notes %}
     <div class="card">
       <div class="muted">{{ n.created_at }}</div>
@@ -39,7 +44,9 @@
       </form>
     </div>
   {% else %}
-    <p class="muted">No notes yet.</p>
+    <div class="card">
+      <p class="muted">No notes yet. Add your first note to generate summaries and flashcards.</p>
+    </div>
   {% endfor %}
 
   {% if request.query_params.get("quiz") and active_quiz %}
@@ -57,12 +64,14 @@
     </div>
   {% endif %}
 
-  <h4>Recent quiz results</h4>
+  <h4 class="section-title">Recent quiz results</h4>
   {% for r in quiz_results %}
     <div class="card">
       Score: <b>{{ r.score }}/{{ r.total }}</b> <span class="muted">({{ r.created_at }})</span>
     </div>
   {% else %}
-    <p class="muted">No quiz results yet.</p>
+    <div class="card">
+      <p class="muted">No quiz results yet. Start a quiz from any note.</p>
+    </div>
   {% endfor %}
 {% endblock %}
