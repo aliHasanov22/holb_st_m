@@ -190,7 +190,7 @@
 
             <div class="card p-3 mb-4">
                 <h6 class="text-secondary small text-uppercase mb-1">Task Completion</h6>
-                <p class="form-helper mb-3">Weekly progress for tasks created at the start of each week.</p>
+                <p class="form-helper mb-3">Complete all tasks to fill the circle.</p>
                 <div style="height: 260px;">
                     <canvas id="taskChart"></canvas>
                 </div>
@@ -281,14 +281,10 @@
             // Inside your Vue methods
             async renderChart() {
                 try {
-                    const res = await fetch('/api/tasks/weekly-summary');
-                    const summaries = await res.json();
-                    const labels = summaries.map(summary => {
-                        const [year, month, day] = summary.week_start.split('-');
-                        return `${month}/${day}`;
-                    });
-                    const completedData = summaries.map(summary => summary.completed_tasks);
-                    const pendingData = summaries.map(summary => summary.total_tasks - summary.completed_tasks);
+                    const res = await fetch('/api/tasks');
+                    const tasks = await res.json();
+                    const completed = tasks.filter(task => task.status === 'Completed').length;
+                    const pending = tasks.length - completed;
 
                     const ctx = document.getElementById('taskChart');
                     if (!ctx) return;
@@ -297,26 +293,18 @@
                     if (window.myChart) window.myChart.destroy();
 
                     window.myChart = new Chart(ctx, {
-                        type: 'bar',
+                        type: 'doughnut',
                         data: {
-                            labels,
+                            labels: ['Completed', 'Pending'],
                             datasets: [{
-                                label: 'Completed',
-                                data: completedData,
-                                backgroundColor: '#198754'
-                            }, {
-                                label: 'Pending',
-                                data: pendingData,
-                                backgroundColor: '#e00034'
+                                data: [completed, pending],
+                                backgroundColor: ['#198754', '#e00034'],
+                                hoverOffset: 4
                             }]
                         },
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
-                            scales: {
-                                x: { stacked: true, ticks: { color: this.isDarkMode ? '#e0e0e0' : '#212529' } },
-                                y: { stacked: true, ticks: { color: this.isDarkMode ? '#e0e0e0' : '#212529' }, beginAtZero: true }
-                            },
                             plugins: {
                                 legend: { position: 'bottom', labels: { color: this.isDarkMode ? '#e0e0e0' : '#212529' } }
                             }
