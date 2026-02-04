@@ -9,22 +9,103 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
     
     <style>
-        :root { --holberton-red: #e00034; --bg-dark: #121212; --card-bg: #1e1e1e; }
-        body { background-color: var(--bg-dark); font-family: 'Roboto Mono', monospace; color: #e0e0e0; }
+        /* --- THEME VARIABLES --- */
+        :root {
+            --holberton-red: #e00034;
+            --holberton-white: #ffffff;
+            /* Default Dark Mode Values */
+            --bg-body: #121212;
+            --bg-card: #1e1e1e;
+            --bg-input: #2b2b2b;
+            --text-main: #e0e0e0;
+            --border-color: #333;
+        }
+
+        /* LIGHT MODE OVERRIDES */
+        [data-bs-theme="light"] {
+            --bg-body: #f4f6f9;        /* Light Gray Background */
+            --bg-card: #ffffff;        /* White Cards */
+            --bg-input: #ffffff;       /* White Inputs */
+            --text-main: #212529;      /* Dark Text */
+            --border-color: #dee2e6;   /* Light Grey Borders */
+        }
+
+        /* --- GLOBAL STYLES --- */
+        body {
+            background-color: var(--bg-body);
+            font-family: 'Roboto Mono', monospace;
+            color: var(--text-main);
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        /* Branding Colors */
         .text-holberton { color: var(--holberton-red) !important; }
         .bg-holberton { background-color: var(--holberton-red) !important; color: white; }
         .border-holberton { border-color: var(--holberton-red) !important; }
-        .card { background-color: var(--card-bg); border: 1px solid #333; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        .btn-primary { background-color: var(--holberton-red); border-color: var(--holberton-red); font-weight: bold; }
-        .btn-primary:hover { background-color: #b3002a; border-color: #b3002a; }
-        .priority-High { border-left: 4px solid var(--holberton-red); background-color: rgba(224, 0, 52, 0.1); }
+
+        /* Card Styling */
+        .card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+
+        /* Buttons */
+        .btn-primary {
+            background-color: var(--holberton-red);
+            border-color: var(--holberton-red);
+            font-weight: bold;
+        }
+        .btn-primary:hover {
+            background-color: #b3002a;
+            border-color: #b3002a;
+        }
+
+        /* Task Priorities */
+        .priority-High { border-left: 4px solid var(--holberton-red); }
         .priority-Medium { border-left: 4px solid #ffc107; }
         .priority-Low { border-left: 4px solid #0dcaf0; }
-        .timer-display { font-size: 2.5rem; color: white; text-shadow: 0 0 10px rgba(224, 0, 52, 0.5); }
-        input, select { background-color: #2b2b2b !important; border: 1px solid #444 !important; color: white !important; }
-        input:focus { border-color: var(--holberton-red) !important; }
-        .table { color: #ccc; }
-        /* GPS Animation */
+
+        /* Timer Display */
+        .timer-display {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: var(--text-main);
+            /* Only glow in dark mode */
+        }
+        [data-bs-theme="dark"] .timer-display {
+            text-shadow: 0 0 10px rgba(224, 0, 52, 0.5);
+        }
+
+        /* Inputs */
+        input, select {
+            background-color: var(--bg-input) !important;
+            border: 1px solid var(--border-color) !important;
+            color: var(--text-main) !important;
+        }
+        input:focus {
+            border-color: var(--holberton-red) !important;
+            box-shadow: 0 0 5px rgba(224, 0, 52, 0.25) !important;
+        }
+
+        /* Table */
+        .table {
+            --bs-table-color: var(--text-main);
+            --bs-table-bg: transparent;
+        }
+
+        /* Mode Toggle Button */
+        .theme-toggle {
+            cursor: pointer;
+            padding: 5px 10px;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-card);
+            color: var(--text-main);
+        }
+
+        /* GPS Pulse Animation */
         @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(224, 0, 52, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(224, 0, 52, 0); } 100% { box-shadow: 0 0 0 0 rgba(224, 0, 52, 0); } }
         .gps-active { animation: pulse 2s infinite; }
     </style>
@@ -33,55 +114,76 @@
 
 {% raw %}
 <div id="app" class="container mt-4" style="max-width: 1000px;">
-    
+
     <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary pb-3">
-        <h2 class="fw-bold"><i class="fas fa-terminal text-holberton me-2"></i>HOLBERTON <span class="text-holberton">PLANNER</span></h2>
-        <span class="badge bg-holberton">v3.0 Geo</span>
+        <h2 class="fw-bold m-0">
+            <i class="fas fa-terminal text-holberton me-2"></i>HOLBERTON <span class="text-holberton">PLANNER</span>
+        </h2>
+
+        <div class="d-flex align-items-center gap-3">
+            <button @click="toggleTheme" class="theme-toggle" title="Toggle Light/Dark Mode">
+                <i class="fas" :class="isDarkMode ? 'fa-sun' : 'fa-moon'"></i>
+                <span class="small fw-bold ms-1">{{ isDarkMode ? 'LIGHT' : 'DARK' }}</span>
+            </button>
+            <span class="badge bg-holberton">v4.0 UI</span>
+        </div>
     </div>
 
     <div class="row">
         <div class="col-lg-7">
+
             <div class="card p-4 mb-4 border-holberton">
                 <h5 class="text-holberton mb-3"><i class="fas fa-code me-2"></i>Deep Work Session</h5>
                 <div class="row align-items-center">
-                    <div class="col-7"><input v-model="studySubject" :disabled="timerRunning" type="text" class="form-control mb-2" placeholder="Project name..."></div>
-                    <div class="col-5 text-end"><div class="timer-display">{{ formattedTime }}</div></div>
+                    <div class="col-7">
+                        <input v-model="studySubject" :disabled="timerRunning" type="text" class="form-control mb-2" placeholder="Project name (e.g. printf)...">
+                    </div>
+                    <div class="col-5 text-end">
+                         <div class="timer-display">{{ formattedTime }}</div>
+                    </div>
                 </div>
                 <div class="d-flex gap-2 mt-2">
-                    <button v-if="!timerRunning" @click="startTimer" class="btn btn-outline-light w-100"><i class="fas fa-play me-2"></i>Start</button>
-                    <button v-if="timerRunning" @click="stopTimer" class="btn btn-primary w-100"><i class="fas fa-save me-2"></i>Stop</button>
+                    <button v-if="!timerRunning" @click="startTimer" class="btn btn-outline-secondary w-100"><i class="fas fa-play me-2"></i>Start</button>
+                    <button v-if="timerRunning" @click="stopTimer" class="btn btn-primary w-100"><i class="fas fa-save me-2"></i>Stop & Save</button>
                 </div>
             </div>
 
             <div class="card p-3 mb-4">
                 <h6 class="text-secondary text-uppercase mb-3 small fw-bold">New Ticket</h6>
                 <div class="row g-2">
-                    <div class="col-6"><input v-model="newTask" @keyup.enter="addTask" type="text" class="form-control" placeholder="Task..."></div>
+                    <div class="col-6"><input v-model="newTask" @keyup.enter="addTask" type="text" class="form-control" placeholder="Task description..."></div>
                     <div class="col-4"><input v-model="newDueDate" type="date" class="form-control"></div>
-                    <div class="col-2"><button @click="addTask" class="btn btn-light w-100 fw-bold text-dark">Add</button></div>
+                    <div class="col-2"><button @click="addTask" class="btn btn-light border w-100 fw-bold">Add</button></div>
                 </div>
             </div>
+
             <div v-for="task in tasks" :key="task.id" class="card mb-2 p-2 px-3 d-flex flex-row justify-content-between align-items-center" :class="'priority-' + task.priority">
                 <div>
-                    <input class="form-check-input me-3 bg-dark border-secondary" type="checkbox" :checked="task.status === 'Completed'" @change="toggleTask(task)">
-                    <span :class="{ completed: task.status === 'Completed', 'fw-bold': true }">{{ task.title }}</span>
+                    <input class="form-check-input me-3 border-secondary" type="checkbox" :checked="task.status === 'Completed'" @change="toggleTask(task)">
+                    <span :class="{ 'text-decoration-line-through text-muted': task.status === 'Completed', 'fw-bold': true }">{{ task.title }}</span>
                 </div>
                 <button @click="deleteTask(task.id)" class="btn btn-sm btn-link text-secondary"><i class="fas fa-trash"></i></button>
             </div>
         </div>
 
         <div class="col-lg-5">
+
+            <div class="card p-3 mb-4">
+                <h6 class="text-secondary small text-uppercase mb-3">Task Completion</h6>
+                <canvas id="taskChart" width="400" height="400"></canvas>
+            </div>
+
             <div class="card p-4 mb-4">
-                <h5 class="text-white border-bottom border-secondary pb-2 mb-3">
-                    <i class="fas fa-map-marker-alt me-2 text-holberton"></i>Campus Access
+                <h5 class="text-holberton border-bottom border-secondary pb-2 mb-3">
+                    <i class="fas fa-map-marker-alt me-2"></i>Campus Access
                 </h5>
 
-                <button @click="gpsCheckIn" :disabled="gpsLoading" class="btn btn-outline-light w-100 mb-3 py-2 fw-bold" :class="{'gps-active': gpsLoading}">
+                <button @click="gpsCheckIn" :disabled="gpsLoading" class="btn btn-outline-secondary w-100 mb-3 py-2 fw-bold" :class="{'gps-active': gpsLoading}">
                     <span v-if="gpsLoading"><i class="fas fa-satellite-dish fa-spin me-2"></i>Locating...</span>
                     <span v-else><i class="fas fa-crosshairs me-2 text-holberton"></i>GPS Auto-Fill</span>
                 </button>
 
-                <div class="p-3 rounded mb-4" style="background-color: #252525;">
+                <div class="p-3 rounded mb-4" style="background-color: var(--bg-input);">
                     <div class="row g-2 mb-3">
                         <div class="col-6">
                             <label class="small text-muted">Entry</label>
@@ -96,17 +198,25 @@
                 </div>
 
                 <div class="d-flex justify-content-between small mb-1">
-                    <span class="text-white">Weekly Quota</span>
-                    <span class="fw-bold" :class="attendanceHours >= 15 ? 'text-success' : 'text-warning'">{{ attendanceHours }} / 15 hrs</span>
+                    <span>Weekly Quota</span>
+                    <span class="fw-bold" :class="attendanceHours >= 15 ? 'text-success' : 'text-warning'">
+                        {{ attendanceHours }} / 15 hrs
+                    </span>
                 </div>
-                <div class="progress mb-4" style="height: 10px; background-color: #333;">
+                <div class="progress mb-4" style="height: 10px;">
                     <div class="progress-bar bg-holberton" role="progressbar" :style="{ width: attendancePercent + '%' }"></div>
                 </div>
 
                 <h6 class="text-secondary small text-uppercase">Log History</h6>
                 <div style="max-height: 200px; overflow-y: auto;">
-                    <table class="table table-sm table-dark table-hover small">
-                        <thead><tr><th class="text-secondary">Date</th><th class="text-secondary">Range</th><th class="text-end text-secondary">Hrs</th></tr></thead>
+                    <table class="table table-sm table-hover small">
+                        <thead>
+                            <tr>
+                                <th class="text-secondary">Date</th>
+                                <th class="text-secondary">Range</th>
+                                <th class="text-end text-secondary">Hrs</th>
+                            </tr>
+                        </thead>
                         <tbody>
                             <tr v-for="log in attendanceLogs" :key="log.date + log.entry">
                                 <td>{{ log.date.slice(5) }}</td>
@@ -129,11 +239,11 @@
     const app = createApp({
         data() {
             return {
+                isDarkMode: true, // Default state
                 tasks: [], newTask: '', newPriority: 'Medium', newDueDate: '',
                 studySubject: '', timerSeconds: 0, timerRunning: false, timerInterval: null,
-                attDate: new Date().toISOString().split('T')[0],
                 attEntry: '', attExit: '', attendanceHours: 0, attendanceLogs: [],
-                gpsLoading: false // NEW for spinner
+                gpsLoading: false
             }
         },
         computed: {
@@ -145,74 +255,97 @@
             attendancePercent() { return Math.min(100, (this.attendanceHours / 15) * 100); }
         },
         methods: {
-            // --- GPS FUNCTION ---
-            gpsCheckIn() {
-                if (!navigator.geolocation) {
-                    return alert("Geolocation is not supported by your browser.");
-                }
-                this.gpsLoading = true;
+            // Inside your Vue methods
+            async renderChart() {
+                try {
+                    const res = await fetch('/api/tasks');
+                    const tasks = await res.json();
 
-                navigator.geolocation.getCurrentPosition(
-                    async (position) => {
-                        // Success: Send coords to backend
-                        try {
-                            const res = await fetch('/api/attendance/check-location', {
-                                method: 'POST',
-                                headers: {'Content-Type': 'application/json'},
-                                body: JSON.stringify({
-                                    lat: position.coords.latitude,
-                                    lon: position.coords.longitude
-                                })
-                            });
-                            const data = await res.json();
-                            this.gpsLoading = false;
+                    // Count statuses manually if you haven't added the /api/stats endpoint yet
+                    const completed = tasks.filter(t => t.status === 'Completed').length;
+                    const pending = tasks.filter(t => t.status === 'Pending').length;
 
-                            if (res.ok) {
-                                alert(data.message);
-                                // Auto-fill logic
-                                if (!this.attEntry) {
-                                    this.attEntry = data.time;
-                                } else {
-                                    this.attExit = data.time;
-                                }
-                            } else {
-                                alert(data.message); // Too far away
+                    const ctx = document.getElementById('taskChart');
+                    if (!ctx) return;
+
+                    // Destroy old chart if it exists to prevent flickering
+                    if (window.myChart) window.myChart.destroy();
+
+                    window.myChart = new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Completed', 'Pending'],
+                            datasets: [{
+                                data: [completed, pending],
+                                backgroundColor: ['#198754', '#e00034'],
+                                hoverOffset: 4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { position: 'bottom', labels: { color: '#e0e0e0' } }
                             }
-                        } catch (e) {
-                            this.gpsLoading = false;
-                            alert("Server error verifying location.");
                         }
-                    },
-                    (error) => {
-                        // Error getting location
-                        this.gpsLoading = false;
-                        alert("Unable to retrieve location. Please allow GPS access.");
-                    }
-                );
+                    });
+                } catch (e) {
+                    console.error("Chart error:", e);
+                }
             },
-            // --- Standard Methods ---
+            // --- THEME TOGGLE FUNCTION ---
+            toggleTheme() {
+                this.isDarkMode = !this.isDarkMode;
+                const htmlEl = document.documentElement;
+
+                if (this.isDarkMode) {
+                    htmlEl.setAttribute('data-bs-theme', 'dark');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    htmlEl.setAttribute('data-bs-theme', 'light');
+                    localStorage.setItem('theme', 'light');
+                }
+            },
+            loadTheme() {
+                const savedTheme = localStorage.getItem('theme');
+                if (savedTheme === 'light') {
+                    this.isDarkMode = false;
+                    document.documentElement.setAttribute('data-bs-theme', 'light');
+                } else {
+                    this.isDarkMode = true;
+                    document.documentElement.setAttribute('data-bs-theme', 'dark');
+                }
+            },
+
+            // --- GPS & API (Same as before) ---
+            gpsCheckIn() {
+                if (!navigator.geolocation) return alert("Geolocation unsupported.");
+                this.gpsLoading = true;
+                navigator.geolocation.getCurrentPosition(async (pos) => {
+                    const res = await fetch('/api/attendance/check-location', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ lat: pos.coords.latitude, lon: pos.coords.longitude }) });
+                    const data = await res.json();
+                    this.gpsLoading = false;
+                    if (res.ok) { alert(data.message); if (!this.attEntry) this.attEntry = data.time; else this.attExit = data.time; }
+                    else alert(data.message);
+                }, () => { this.gpsLoading = false; alert("GPS Error."); });
+            },
             async fetchTasks() { const res = await fetch('/api/tasks'); this.tasks = await res.json(); },
-            async addTask() {
-                if (!this.newTask) return;
-                const res = await fetch('/api/tasks', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ title: this.newTask, priority: 'Medium', due_date: this.newDueDate }) });
-                this.tasks.unshift(await res.json()); this.newTask = '';
-            },
+            async addTask() { if (!this.newTask) return; const res = await fetch('/api/tasks', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ title: this.newTask, priority: 'Medium', due_date: this.newDueDate }) }); this.tasks.unshift(await res.json()); this.newTask = ''; },
             async toggleTask(task) { const res = await fetch(`/api/tasks/${task.id}/toggle`, { method: 'PUT' }); task.status = (await res.json()).status; },
             async deleteTask(id) { await fetch(`/api/tasks/${id}`, { method: 'DELETE' }); this.tasks = this.tasks.filter(t => t.id !== id); },
             startTimer() { this.timerRunning = true; this.timerInterval = setInterval(() => { this.timerSeconds++; }, 1000); },
             async stopTimer() { clearInterval(this.timerInterval); this.timerRunning = false; this.timerSeconds = 0; },
             async fetchAttendance() { const res = await fetch('/api/attendance'); const data = await res.json(); this.attendanceHours = data.total_hours; this.attendanceLogs = data.logs; },
-            async addAttendance() {
-                if (!this.attEntry || !this.attExit) return alert("Please enter both times.");
-                const res = await fetch('/api/attendance', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ date: this.attDate, entry: this.attEntry, exit: this.attExit }) });
-                const data = await res.json();
-                if (!res.ok) alert(data.error || "Error");
-                else if (data.hours === 0) alert("Logged 0 hours (Check window/weekend).");
-                this.fetchAttendance(); this.attEntry = ''; this.attExit = '';
-            }
+            async addAttendance() { if (!this.attEntry || !this.attExit) return alert("Enter both times."); const res = await fetch('/api/attendance', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ entry: this.attEntry, exit: this.attExit }) }); const data = await res.json(); if (!res.ok) alert(data.error); else { this.fetchAttendance(); this.attEntry = ''; this.attExit = ''; } }
         },
-        mounted() { this.fetchTasks(); this.fetchAttendance(); }
+        mounted() {
+            this.loadTheme(); // <-- LOAD THEME ON STARTUP
+            this.fetchTasks();
+            this.fetchAttendance();
+            this.renderChart();
+        }
     });
+
     app.mount('#app');
 </script>
 </body>
