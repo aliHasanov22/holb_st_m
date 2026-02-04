@@ -4,6 +4,9 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta, time
 import math # <--- NEW: Needed for distance calculation
 from sqlalchemy import func
+import re
+import requests
+from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///planner.db'
@@ -162,6 +165,59 @@ def ensure_weekly_summaries():
         week_cursor += timedelta(days=7)
     db.session.commit()
 
+def parse_holberton_date(date_text):
+    match = re.search(r'\d{4}-\d{2}-\d{2}', date_text)
+    if not match:
+        return None
+    return datetime.strptime(match.group(0), '%Y-%m-%d').date()
+
+def sync_holberton_projects(session_cookie):
+    url = "https://intranet.hbtn.io/projects/current"
+    headers = {'Cookie': f'_holberton_intranet_session={session_cookie}'}
+
+    response = requests.get(url, headers=headers, timeout=15)
+    if response.status_code != 200:
+        return None
+
+    soup = BeautifulSoup(response.text, 'html.parser')
+    projects = []
+
+    for project_div in soup.select('.list-group-item'):
+        name_el = project_div.select_one('h4')
+        deadline_el = project_div.select_one('.deadline')
+        if not name_el or not deadline_el:
+            continue
+        name = name_el.text.strip()
+        deadline_raw = deadline_el.text.strip()
+        projects.append({'title': name, 'deadline': deadline_raw})
+
+    return projects
+
+def sync_holberton_stats(session_cookie):
+    url = "https://intranet.hbtn.io/users/my_profile"
+    headers = {'Cookie': f'_holberton_intranet_session={session_cookie}'}
+
+    response = requests.get(url, headers=headers, timeout=15)
+    if response.status_code != 200:
+        return None
+
+    soup = BeautifulSoup(response.text, 'html.parser')
+    stats = {}
+
+    for row in soup.select('.list-group-item'):
+        label_el = row.select_one('strong')
+        value_el = row.select_one('span')
+        if not label_el or not value_el:
+            continue
+        label = label_el.text.strip().lower()
+        value = value_el.text.strip()
+        if 'attendance' in label:
+            stats['attendance'] = value
+        if 'average' in label:
+            stats['average'] = value
+
+    return stats
+
 # --- ROUTES ---
 @app.route('/')
 def index():
@@ -224,6 +280,54 @@ def task_weekly_summary():
         })
 
     return jsonify(response)
+
+@app.route('/api/sync', methods=['POST'])
+def sync_projects():
+    data = request.json
+    session_cookie = data.get('session_cookie')
+    if not session_cookie:
+        return jsonify({'error': 'Session cookie required.'}), 400
+
+    projects = sync_holberton_projects(session_cookie)
+    if projects is None:
+        return jsonify({'error': 'Failed to sync projects.'}), 400
+
+    added_tasks = []
+    skipped = 0
+
+    for project in projects:
+        existing = Task.query.filter_by(title=project['title']).first()
+        if existing:
+            skipped += 1
+            continue
+        due_date = parse_holberton_date(project['deadline'])
+        new_task = Task(
+            title=project['title'],
+            priority='High',
+            due_date=due_date
+        )
+        db.session.add(new_task)
+        added_tasks.append(new_task)
+
+    db.session.commit()
+
+    return jsonify({
+        'added': [task.to_dict() for task in added_tasks],
+        'skipped': skipped
+    })
+
+@app.route('/api/intranet-stats', methods=['POST'])
+def intranet_stats():
+    data = request.json
+    session_cookie = data.get('session_cookie')
+    if not session_cookie:
+        return jsonify({'error': 'Session cookie required.'}), 400
+
+    stats = sync_holberton_stats(session_cookie)
+    if stats is None:
+        return jsonify({'error': 'Failed to fetch stats.'}), 400
+
+    return jsonify(stats)
 
 @app.route('/api/tasks/<int:id>', methods=['DELETE'])
 def delete_task(id):

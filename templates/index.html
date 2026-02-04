@@ -127,6 +127,9 @@
                 <i class="fas" :class="isDarkMode ? 'fa-sun' : 'fa-moon'"></i>
                 <span class="small fw-bold ms-1">{{ isDarkMode ? 'LIGHT' : 'DARK' }}</span>
             </button>
+            <button @click="syncIntranet" class="btn btn-outline-secondary btn-sm fw-bold">
+                <i class="fas fa-rotate me-1"></i>Sync Intranet
+            </button>
             <span class="badge bg-holberton">v4.0 UI</span>
         </div>
     </div>
@@ -204,6 +207,21 @@
                 </div>
             </div>
 
+            <div class="card p-3 mb-4">
+                <h6 class="text-secondary small text-uppercase mb-2">Intranet Stats</h6>
+                <div class="d-flex justify-content-between small mb-2">
+                    <span>Attendance</span>
+                    <span class="fw-bold">{{ intranetStats.attendance || '—' }}</span>
+                </div>
+                <div class="progress mb-3" style="height: 10px;">
+                    <div class="progress-bar" role="progressbar" :class="attendanceProgressClass" :style="{ width: intranetAttendancePercent + '%' }"></div>
+                </div>
+                <div class="d-flex justify-content-between small">
+                    <span>Average</span>
+                    <span class="fw-bold">{{ intranetStats.average || '—' }}</span>
+                </div>
+            </div>
+
             <div class="card p-4 mb-4">
                 <h5 class="text-holberton border-bottom border-secondary pb-2 mb-3">
                     <i class="fas fa-map-marker-alt me-2"></i>Campus Access
@@ -274,7 +292,9 @@
                 tasks: [], newTask: '', newPriority: 'Medium', newStartDate: '', newDueDate: '',
                 studySubject: '', timerSeconds: 0, timerRunning: false, timerInterval: null,
                 attEntry: '', attExit: '', attendanceHours: 0, attendanceLogs: [],
-                gpsLoading: false
+                gpsLoading: false,
+                intranetStats: { attendance: '', average: '' },
+                intranetLoading: false
             }
         },
         computed: {
@@ -283,7 +303,15 @@
                 const secs = (this.timerSeconds % 60).toString().padStart(2, '0');
                 return `${mins}:${secs}`;
             },
-            attendancePercent() { return Math.min(100, (this.attendanceHours / 15) * 100); }
+            attendancePercent() { return Math.min(100, (this.attendanceHours / 15) * 100); },
+            intranetAttendancePercent() {
+                const match = String(this.intranetStats.attendance || '').match(/[\d.]+/);
+                if (!match) return 0;
+                return Math.min(100, parseFloat(match[0]));
+            },
+            attendanceProgressClass() {
+                return this.intranetAttendancePercent < 85 ? 'bg-danger' : 'bg-success';
+            }
         },
         methods: {
             // Inside your Vue methods
@@ -344,6 +372,39 @@
                 } else {
                     this.isDarkMode = true;
                     document.documentElement.setAttribute('data-bs-theme', 'dark');
+                }
+            },
+            async syncIntranet() {
+                if (this.intranetLoading) return;
+                const cookie = prompt('Paste your Holberton session cookie:');
+                if (!cookie) return;
+                this.intranetLoading = true;
+                try {
+                    const res = await fetch('/api/sync', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ session_cookie: cookie })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) {
+                        alert(data.error || 'Sync failed.');
+                    } else {
+                        this.fetchTasks();
+                        this.renderChart();
+                    }
+                    const statsRes = await fetch('/api/intranet-stats', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ session_cookie: cookie })
+                    });
+                    const statsData = await statsRes.json();
+                    if (statsRes.ok) {
+                        this.intranetStats = statsData;
+                    }
+                } catch (e) {
+                    alert('Sync failed.');
+                } finally {
+                    this.intranetLoading = false;
                 }
             },
 
